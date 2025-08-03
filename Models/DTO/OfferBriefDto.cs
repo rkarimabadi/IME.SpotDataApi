@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IME.MobileApp.Api.Models
+namespace IME.SpotDataApi.Models.DTO
 {
     public class OfferBriefDto
     {

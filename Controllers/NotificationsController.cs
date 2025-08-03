@@ -1,5 +1,5 @@
-﻿using IME.MobileApp.Api.Models;
-using IME.SpotDataApi.Interfaces;
+﻿using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.DTO;
 using Microsoft.AspNetCore.Mvc;
 
 

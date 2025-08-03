@@ -1,13 +1,7 @@
-﻿using IME.MobileApp.Api.Models;
-using IME.SpotDataApi.Interfaces;
-using IME.SpotDataApi.Models.General;
-using IME.SpotDataApi.Models.Spot;
-using IME.SpotDataApi.Services.Authenticate;
-using IME.SpotDataApi.Services.RemoteData;
-using Microsoft.AspNetCore.Http;
+﻿using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.DTO;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using System.Net.Http.Headers;
+
 
 namespace IME.SpotDataApi.Controllers
 {

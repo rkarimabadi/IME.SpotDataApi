@@ -14,6 +14,14 @@ namespace IME.SpotDataApi.Helpers
             string result = $"{year.ToString("D4")}{month.ToString("D2")}{day.ToString("D2")}";
             return result;
         }
+        public string GetPersian(DateTime date)
+        {
+            int year = pc.GetYear(date);
+            int month = pc.GetMonth(date);
+            int day = pc.GetDayOfMonth(date);
+            string result = $"{year.ToString("D4")}/{month.ToString("D2")}/{day.ToString("D2")}";
+            return result;
+        }
         public (int, int, int) GetPersianDateTupple(DateTime date)
         {
             return (pc.GetYear(date), pc.GetMonth(date), pc.GetDayOfMonth(date));

@@ -2,6 +2,7 @@
 using IME.SpotDataApi.Interfaces;
 using IME.SpotDataApi.Models.Public;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Internal;
 
 namespace IME.SpotDataApi.Services.Data
 {
@@ -21,25 +22,44 @@ namespace IME.SpotDataApi.Services.Data
                 return;
             }
 
-            using var context = _dbContextFactory.CreateDbContext();
+            await using var context = await _dbContextFactory.CreateDbContextAsync();
             var dbSet = context.Set<T>();
 
-            foreach (var entity in entities)
-            {
-                var existingEntity = await dbSet.AsNoTracking().FirstOrDefaultAsync(e => e.Id == entity.Id);
+            var primaryKeyProperties = context.Model.FindEntityType(typeof(T))?.FindPrimaryKey()?.Properties;
 
-                if (entity != null && !context.Set<T>().Any(a => a == entity))
+            // حالت اول: موجودیت کلید اصلی ندارد (مانند TradeReport)
+            // در این حالت، همه را به عنوان رکورد جدید اضافه می‌کنیم.
+            if (primaryKeyProperties == null || !primaryKeyProperties.Any())
+            {
+                await dbSet.AddRangeAsync(entities);
+            }
+            // حالت دوم: موجودیت کلید اصلی دارد
+            else
+            {
+                foreach (var entity in entities)
                 {
-                    context.Set<T>().Add(entity);
-                    await context.SaveChangesAsync();
+                    // مقادیر کلید اصلی را از موجودیت فعلی استخراج می‌کنیم
+                    var keyValues = primaryKeyProperties
+                        .Select(p => p.PropertyInfo.GetValue(entity))
+                        .ToArray();
+
+                    // با استفاده از کلید، موجودیت را در دیتابیس پیدا می‌کنیم
+                    var existingEntity = await dbSet.FindAsync(keyValues);
+
+                    if (existingEntity != null)
+                    {
+                        // اگر موجود بود، مقادیر آن را با مقادیر جدید به‌روزرسانی می‌کنیم
+                        context.Entry(existingEntity).CurrentValues.SetValues(entity);
+                    }
+                    else
+                    {
+                        // اگر موجود نبود، آن را به عنوان رکورد جدید اضافه می‌کنیم
+                        dbSet.Add(entity);
+                    }
                 }
             }
-            try
-            {
-            } catch(Exception e)
-            {
-               Console.WriteLine(e.Message);
-            }
+
+            await context.SaveChangesAsync();
         }
     }
 }

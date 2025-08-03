@@ -6,15 +6,33 @@ using IME.SpotDataApi.Models.General;
 using IME.SpotDataApi.Models.Notification;
 using IME.SpotDataApi.Repository;
 using IME.SpotDataApi.Services.Authenticate;
+using IME.SpotDataApi.Services.Dashboard;
 using IME.SpotDataApi.Services.Data;
 using IME.SpotDataApi.Services.RemoteData;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins,
+                      policy  =>
+                      {
+                          if (allowedOrigins != null && allowedOrigins.Length > 0)
+                          {
+                              policy.WithOrigins(allowedOrigins)
+                                    .AllowAnyHeader()
+                                    .AllowAnyMethod();
+                          }
+                      });
+});
+
 // Add services to the container.
 
 builder.Services.AddHostedService<DataSyncService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -59,6 +77,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors(MyAllowSpecificOrigins);
 
 app.UseAuthorization();
 

@@ -1,7 +1,5 @@
-﻿using IME.MobileApp.Api.Models;
-using IME.SpotDataApi.Interfaces;
-using IME.SpotDataApi.Models.Spot;
-using IME.SpotDataApi.Services.RemoteData;
+﻿using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.DTO;
 using Microsoft.AspNetCore.Mvc;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860

@@ -1,4 +1,4 @@
-﻿namespace IME.MobileApp.Api.Models
+﻿namespace IME.SpotDataApi.Models.DTO
 {
     public class OfferDetailDto
     {
