@@ -1,0 +1,51 @@
+﻿@IME.SpotDataApi_HostAddress = http://localhost:5157
+
+GET {{IME.SpotDataApi_HostAddress}}/api/Authenticate/
+Accept: application/json
+###
+# ===================================
+# کنترلر پیشنهادات (OffersController)
+# ===================================
+
+# دریافت لیست خلاصه پیشنهادات با صفحه‌بندی
+# @name GetOffersList
+GET {{IME.SpotDataApi_HostAddress}}/api/offers?pageNumber=1&pageSize=10
+Accept: application/json
+
+###
+
+# دریافت جزئیات یک پیشنهاد خاص با شناسه آن
+# شناسه نمونه را با یک شناسه معتبر جایگزین کنید
+@offerId = 1
+# @name GetOfferById
+GET {{IME.SpotDataApi_HostAddress}}/api/offers/{{offerId}}
+Accept: application/json
+
+###
+# ===================================
+# کنترلر گزارش معاملات (TradeReportsController)
+# ===================================
+
+# دریافت لیست گزارش معاملات با صفحه‌بندی
+# @name GetTradeReportsList
+GET {{IME.SpotDataApi_HostAddress}}/api/tradereports?pageNumber=1&pageSize=15
+Accept: application/json
+
+###
+# ===================================
+# کنترلر اطلاعیه‌ها (NotificationsController)
+# ===================================
+
+# دریافت لیست اطلاعیه‌های خبری
+# @name GetNewsNotifications
+GET {{IME.SpotDataApi_HostAddress}}/api/notifications/news?pageNumber=1&pageSize=5
+Accept: application/json
+
+###
+
+# دریافت لیست اطلاعیه‌های مربوط به معاملات نقدی (Spot)
+# @name GetSpotNotifications
+GET {{IME.SpotDataApi_HostAddress}}/api/notifications/spot?pageNumber=1&pageSize=5
+Accept: application/json
+
+

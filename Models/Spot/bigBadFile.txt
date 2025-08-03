@@ -1,0 +1,517 @@
+using IME.SpotDataApi.Models.Public;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class BaseInfoCount
+    {
+        public int Brokers { get; set; }
+        public int Commodities { get; set; }
+        public int ContractTypes { get; set; }
+        public int CurrencyUnits { get; set; }
+        public int Manufacturers { get; set; }
+        public int MeasurementUnits { get; set; }
+        public int Suppliers { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class BuyMethod : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> ˜ÇáÇ </summary>
+    public class Commodity : BaseInfo
+    {
+        public int? ParentId { get; set; }
+        public string Symbol { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> Ñæå ÈäÏí ˜ÇáÇ </summary>
+    public class CommodityGroup : BaseInfo
+    {
+        /// <summary> ÔäÇÓå æÇáÏ </summary>
+        public int? ParentId { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class ContractType : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class CurrencyUnit : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class DeliveryPlace : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> äÑÎ ÈÑÇÈÑí ÇÑÒ </summary>
+    public class ExchangeRate : BaseInfo
+    {
+        /// <summary> ÔäÇÓå ÇÑÒ </summary>
+        public int CurrencyId { get; set; }
+
+        /// <summary> ÊÇÑíÎ äÑÎ ÇÑÒ </summary>
+        public string Date { get; set; }
+
+        /// <summary> äÑÎ ÇÑÒ </summary>
+        public decimal Rate { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> Ñæå ÈäÏí ˜ÇáÇ </summary>
+    public class Group : CommodityGroup
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class MainGroup : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> ÊæáíÏ ˜ääÏå </summary>
+    public class Manufacturer : BaseInfo
+    {
+        /// <summary>
+        /// äãÇÏ ÊæáíÏ ˜ääÏå
+        /// </summary>
+        public string Symbol { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class MeasurementUnit : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    //TODO: ÏÑ äÇÑÔ ÈÚÏí ÈÇíÓÊí ÚäæÇä ÊÛííÑ íÏÇ ˜äÏ 
+    //TODO: ãİåæã ÍÑÇÌ æ ãäÇŞÕå ÏíÏå äÔÏå ÇÓÊ
+    /// <summary> ÚÑÖå </summary>
+    public class Offer : RootObj<int>
+    {
+        /// <summary> ÔäÇÓå ˜ÇÑÒÇÑí </summary>
+        public int BrokerId { get; set; }
+        /// <summary> ˜ÇÑÒÇÑí </summary>
+        public Broker Broker { get; set; }
+
+        /// <summary> ÔäÇÓå ÑæÔ ÎÑíÏ </summary>
+        public int BuyMethodId { get; set; }
+
+        /// <summary> ÔäÇÓå ˜ÇáÇ </summary>
+        public int CommodityId { get; set; }
+
+        /// <summary> ˜ÇáÇ </summary>
+        public Commodity Commodity { get; set; }
+        /// <summary> ÔäÇÓå äæÚ ŞÑÇÑÏÇÏ </summary>
+        public int ContractTypeId { get; set; }
+        /// <summary> äæÚ ŞÑÇÑÏÇÏ </summary>
+        public ContractType ContractType { get; set; }
+        /// <summary> ÔäÇÓå ÇÑÒ </summary>
+        public int CurrencyId { get; set; }
+        /// <summary> ÇÑÒ </summary>
+        public CurrencyUnit CurrencyUnit { get; set; }
+
+        /// <summary> ÊÇÑíÎ ÊÍæíá </summary>
+        public string DeliveryDate { get; set; }
+
+        /// <summary> ÔäÇÓå ãÍá ÊÍæíá </summary>
+        public int DeliveryPlaceId { get; set; }
+
+        /// <summary> ÔÑÍ ÚÑÖå </summary>
+        public string Description { get; set; }
+
+        /// <summary> ŞíãÊ Çíå </summary>
+        public decimal InitPrice { get; set; }
+
+        /// <summary> ãŞÏÇÑ ÚÑÖå Çæáíå </summary>
+        public decimal InitVolume { get; set; }
+
+        /// <summary> ÇäÏÇÒå ãÍãæáå </summary>
+        public decimal LotSize { get; set; }
+
+        /// <summary> ÔäÇÓå ÊæáíÏ ˜ääÏå </summary>
+        public int ManufacturerId { get; set; }
+        /// <summary> ÊæáíÏ ˜ääÏå </summary>
+        public Manufacturer Manufacturer { get; set; }
+
+        /// <summary> ÈíÔíäå ŞíãÊ Çíå </summary>
+        public decimal MaxInitPrice { get; set; }
+
+        /// <summary> ÈíÔíäå ÇİÒÇíÔ ãŞÏÇÑ ÚÑÖå </summary>
+        public decimal MaxIncOfferVol { get; set; }
+
+        /// <summary> ÈíÔíäå ãŞÏÇÑ ÓİÇÑÔ </summary>
+        public decimal MaxOrderVol { get; set; }
+
+        /// <summary> ÈíÔíäå ŞíãÊ ÚÑÖå </summary>
+        public decimal MaxOfferPrice { get; set; }
+
+        /// <summary> ˜Ï æÇÍÏ ÇäÏÇÒå íÑí </summary>
+        public int MeasureUnitId { get; set; }
+        /// <summary> æÇÍÏ ÇäÏÇÒå íÑí </summary>
+        public MeasurementUnit MeasurementUnit { get; set; }
+
+        /// <summary> ˜ãíäå ãŞÏÇÑ ÊÎÕíÕ </summary>
+        public decimal MinAllocationVol { get; set; }
+
+        /// <summary> ˜ãíäå ãŞÏÇÑ ÚÑÖå </summary>
+        public decimal MinOfferVol { get; set; }
+
+        /// <summary> ˜ãíäå ŞíãÊ Çíå </summary>
+        public decimal MinInitPrice { get; set; }
+
+        /// <summary> ˜ãíäå ãŞÏÇÑ ÓİÇÑÔ </summary>
+        public decimal MinOrderVol { get; set; }
+
+        /// <summary> ˜ãíäå ŞíãÊ ÚÑÖå </summary>
+        public decimal MinOfferPrice { get; set; }
+
+        /// <summary> ÊÇÑíÎ ÚÑÖå </summary>
+        public string OfferDate { get; set; }
+
+        /// <summary> ÔäÇÓå äÍæå ÚÑÖå </summary>
+        public int OfferModeId { get; set; }
+
+        /// <summary> äÇã ÊÇáÇÑ ÚÑÖå </summary>
+        public string OfferRing { get; set; }
+
+        /// <summary> äãÇÏ ÚÑÖå </summary>
+        public string OfferSymbol { get; set; }
+
+        /// <summary> äæÚ ÚÑÖå </summary>
+        public int OfferTypeId { get; set; }
+
+        /// <summary> ãíÒÇä ÚÑÖå </summary>
+        public decimal OfferVol { get; set; }
+
+        /// <summary> äæÚ ÈÓÊå ÈäÏí </summary>
+        public int PackagingTypeId { get; set; }
+
+        /// <summary> ÎØÇí ãÌÇÒ ÊÍæíá </summary>
+        public decimal PermissibleError { get; set; }
+
+        /// <summary> ˜ãíäå ãŞÏÇÑ ˜Ôİ äÑÎ </summary>
+        public decimal PriceDiscoveryMinOrderVol { get; set; }
+
+        /// <summary> ÏÑÕÏ íÔ ÑÏÇÎÊ </summary>
+        public decimal PrepaymentPercent { get; set; }
+
+        /// <summary> äæÚ ÊÖãíä </summary>
+        public int SecurityTypeId { get; set; }
+
+        /// <summary> ÊæÖíÍÇÊ ÊÖãíä </summary>
+        public string SecurityTypeNote { get; set; }
+
+        /// <summary> ˜Ï äæÚ ÊÓæíå </summary>
+        public int SettlementTypeId { get; set; }
+
+        /// <summary> ÔäÇÓå ÚÑÖå ˜ääÏå </summary>
+        public int SupplierId { get; set; }
+        /// <summary> ÚÑÖå ˜ääÏå </summary>
+        public Supplier? Supplier { get; set; }
+
+        /// <summary> ˜ãíäå ÍÑ˜Ê ŞíãÊ </summary>
+        public decimal TickSize { get; set; }
+
+        /// <summary> ˜Ï ÊÇáÇÑ ãÚÇãáÇÊ </summary>
+        public int TradingHallId { get; set; }
+
+        /// <summary> æÖÚíÊ ãÚÇãáå </summary>
+        public string TradeStatus { get; set; }
+
+        /// <summary> ÖÑíÈ æÒäí </summary>
+        public decimal WeightFactor { get; set; }
+    }
+}
+namespace IME.SpotDataApi.Models.Spot
+{
+
+    /// <summary> ÚÑÖå </summary>
+    public class OfferBrif : RootObj<int>
+    {
+        public required string Commodity { get; set; }
+        public required string Supplier { get; set; }
+        public string Date { get; set; }
+        public bool TradeStatus { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class OfferMode : BaseInfo
+    {
+    }
+}
+namespace IME.SpotDataApi.Models.Spot
+{
+
+    /// <summary> ÚÑÖå </summary>
+    public class OfferSummary : RootObj<int>
+    {
+        public required string TradingHall { get; set; }
+        public int NumberOfOffers { get; set; }
+        public int NumberOfTradedOffers { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class OfferType : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class PackagingType : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class SecurityType : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class SettlementType : BaseInfo
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> Ñæå ÈäÏí ˜ÇáÇ </summary>
+    public class SubGroup : CommodityGroup
+    {
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> ÚÑÖå ˜ääÏå </summary>
+    public class Supplier : BaseInfo
+    {
+        /// <summary>
+        /// ÔäÇÓå ãÔÊÑí
+        /// </summary>
+        public int CustomerId { get; set; }
+
+        /// <summary>
+        /// ˜Ï ãáí
+        /// </summary>
+        public string? NationalCode { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    /// <summary> ãäÇŞÕå </summary>
+    public class Tender : RootObj<int>
+    {
+        /// <summary> ŞíãÊ Çíå </summary>
+        public decimal InitPrice { get; set; }
+
+        /// <summary> ÔäÇÓå äæÚ ÊÓæíå </summary>
+        public int SettlementTypeId { get; set; }
+
+        /// <summary> ÔäÇÓå äæÚ ŞÑÇÑÏÇÏ </summary>
+        public int ContractTypeId { get; set; }
+
+        /// <summary> ÊÇÑíÎ ÊÍæíá </summary>
+        public string DeliveryDate { get; set; }
+
+        /// <summary> ÔäÇÓå ãÍá ÊÍæíá </summary>
+        public int DeliveryPlaceId { get; set; }
+
+        /// <summary> ÔäÇÓå ˜ÇáÇ </summary>
+        public int CommodityId { get; set; }
+
+        /// <summary> ÈíÔíäå ÇİÒÇíÔ ÊŞÇÖÇ </summary>
+        public int MaxIncreaseDemand { get; set; }
+
+        /// <summary> ÖÑíÈ ÈÇÑ </summary>
+        public decimal LoadFactor { get; set; }
+
+        /// <summary> ÊÚÏÇÏ ãÍãæáå ÏÑÎæÇÓÊí </summary>
+        public int LotCount { get; set; }
+
+        /// <summary> ÇäÏÇÒå ãÍãæáå </summary>
+        public int LotSize { get; set; } //LotSize
+
+        /// <summary> ÈíÔíäå ŞíãÊ ÎÑíÏ </summary>
+        public decimal MaxBuyPrice { get; set; }
+
+        /// <summary> ÈíÔíäå ŞíãÊ İÑæÔ </summary>
+        public decimal MaxSellPrice { get; set; }
+
+        /// <summary> ˜ãíäå ŞíãÊ ÎÑíÏ </summary>
+        public decimal MinBuyPrice { get; set; }
+
+        /// <summary> ˜ãíäå ŞíãÊ İÑæÔ </summary>
+        public decimal MinSellPrice { get; set; }
+
+        /// <summary> äæÚ ÈÓÊå ÈäÏí </summary>
+        public int PackagingTypeId { get; set; }
+
+        /// <summary> äãÇÏ ãäÇŞÕå </summary>
+        public string Symbol { get; set; }
+
+        /// <summary> ÔäÇÓå ãäÇŞÕå ÒÇÑ </summary>
+        public int TenderApplicantId { get; set; }
+
+        /// <summary> ÔäÇÓå ˜ÇÑÒÇÑí </summary>
+        public int BrokerId { get; set; }
+
+        /// <summary> ÊÇÑíÎ ãäÇŞÕå </summary>
+        public string TenderDate { get; set; }
+
+        /// <summary> ÔÑÍ ãäÇŞÕå </summary>
+        public string Description { get; set; }
+
+        /// <summary> äæÚ ÊÖãíä </summary>
+        public int SecurityTypeId { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class TradeReport : RootObj<int>
+    {
+        /// <summary> ÑæÔ ÎÑíÏ </summary>
+        public string BuyMethod { get; set; }
+
+        /// <summary> ÔäÇÓå ˜ÇáÇ </summary>
+        public int CommodityId { get; set; }
+
+        /// <summary> ˜ÇáÇ </summary>
+        public Commodity Commodity { get; set; }
+
+        /// <summary> ÔäÇÓå äæÚ ÇÑÒ </summary>
+        public int CurrencyId { get; set; }
+
+        /// <summary> äæÚ ÇÑÒ </summary>
+        public CurrencyUnit CurrencyUnit { get; set; }
+
+        /// <summary> ÔäÇÓå ÚÑÖå </summary>       
+        public int OfferId { get; set; }
+
+        /// <summary> ÚÑÖå </summary>       
+        public Offer Offer { get; set; }
+
+        /// <summary> äãÇÏ ÚÑÖå </summary>
+        public string OfferSymbol { get; set; }
+
+
+
+        /// <summary> ÔäÇÓå äæÚ ŞÑÇÑÏÇÏ </summary>
+        public int ContractTypeId { get; set; }
+
+        /// <summary> äæÚ ŞÑÇÑÏÇÏ </summary>
+        public ContractType ContractType { get; set; }
+
+        /// <summary> äæÚ ÚÑÖå </summary>
+        public string OfferType { get; set; }
+
+        /// <summary> äÍæå ÚÑÖå </summary>
+        public string OfferMode { get; set; }
+
+        /// <summary> ãŞÏÇÑ ÓİÇÑÔ </summary>
+        public decimal DemandVolume { get; set; }
+
+        /// <summary> ãíÒÇä ÚÑÖå </summary>
+        public decimal OfferVolume { get; set; }
+
+        /// <summary> ãíÇäíä æÒäí ŞíãÊ ÇíÇäí </summary>
+        public decimal FinalWeightedAveragePrice { get; set; }
+
+        /// <summary> ÓÑ ÑÓíÏ </summary>
+        public string DueDate { get; set; }
+
+        /// <summary> ÔäÇÓå ÊæáíÏ ˜ääÏå </summary>
+        public int ManufacturerId { get; set; }
+
+        /// <summary> ÊæáíÏ ˜ääÏå </summary>
+        public Manufacturer Manufacturer { get; set; }
+
+        /// <summary> ÔäÇÓå æÇÍÏ ÇäÏÇÒå íÑí </summary>
+        public int MeasurementUnitId { get; set; }
+
+        /// <summary> æÇÍÏ ÇäÏÇÒå íÑí </summary>
+        public MeasurementUnit MeasurementUnit { get; set; }
+
+        /// <summary> ÈíÔíäå ŞíãÊ </summary>
+        public decimal MaximumPrice { get; set; }
+
+        /// <summary> ˜ãíäå ŞíãÊ </summary>
+        public decimal MinimumPrice { get; set; }
+
+        /// <summary> ŞíãÊ Çíå ÚÑÖå </summary>
+        public decimal OfferBasePrice { get; set; }
+
+        /// <summary> ÔäÇÓå ˜ÇÑÒÇÑí İÑæÔäÏå </summary>
+        public int SellerBrokerId { get; set; }
+
+        /// <summary> ˜ÇÑÒÇÑí İÑæÔäÏå </summary>
+        public Broker SellerBroker { get; set; }
+
+        /// <summary> ÔäÇÓå ÚÑÖå ˜ääÏå </summary>
+        public int SupplierId { get; set; }
+
+        /// <summary> ÚÑÖå ˜ääÏå </summary>
+        public Supplier Supplier { get; set; }
+
+        /// <summary> ÊÇÑíÎ ãÚÇãáå </summary>
+        public string TradeDate { get; set; }
+
+        /// <summary> ÇÑÒÔ ãÚÇãáÇÊ (åÒÇÑ ÑíÇá) </summary>
+        public decimal TradeValue { get; set; }
+
+        /// <summary> ÍÌã ãÚÇãáÇÊ </summary>
+        public decimal TradeVolume { get; set; }
+
+        /// <summary> </summary>
+        public int Id { get; set; }
+    }
+}
+
+namespace IME.SpotDataApi.Models.Spot
+{
+    public class TradingHall : BaseInfo
+    {
+    }
+}

@@ -1,0 +1,155 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ابلاغیه" xml:space="preserve">
+    <value>&lt;svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"&gt;
+&lt;path opacity="0.4" d="M15.7162 16.2234H8.4962" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path opacity="0.4" d="M15.7162 12.0369H8.4962" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path opacity="0.4" d="M11.2513 7.86011H8.4963" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path fill-rule="evenodd" clip-rule="evenodd" d="M15.9086 2.74976C15.9086 2.74976 8.2316 2.75376 8.2196 2.75376C5.4596 2.77076 3.7506 4.58676 3.7506 7.35676V16.5528C3.7506 19.3368 5.4726 21.1598 8.2566 21.1598C8.2566 21.1598 15.9326 21.1568 15.9456 21.1568C18.7056 21.1398 20.4156 19.3228 20.4156 16.5528V7.35676C20.4156 4.57276 18.6926 2.74976 15.9086 2.74976Z" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;/svg&gt;</value>
+  </data>
+  <data name="اصلاحیه" xml:space="preserve">
+    <value>&lt;svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"&gt;
+&lt;path opacity="0.4" d="M11.4923 2.78894H7.7533C4.6783 2.78894 2.75031 4.96594 2.75031 8.04794V16.3619C2.75031 19.4439 4.6693 21.6209 7.7533 21.6209H16.5773C19.6623 21.6209 21.5813 19.4439 21.5813 16.3619V12.3339" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path fill-rule="evenodd" clip-rule="evenodd" d="M8.8278 10.9209L16.3008 3.44787C17.2318 2.51787 18.7408 2.51787 19.6718 3.44787L20.8888 4.66487C21.8198 5.59587 21.8198 7.10587 20.8888 8.03587L13.3798 15.5449C12.9728 15.9519 12.4208 16.1809 11.8448 16.1809H8.0988L8.1928 12.4009C8.2068 11.8449 8.4338 11.3149 8.8278 10.9209Z" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path d="M15.1652 4.60242L19.7312 9.16842" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;/svg&gt;</value>
+  </data>
+  <data name="تمدید مجوز" xml:space="preserve">
+    <value>&lt;svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"&gt;
+&lt;path fill-rule="evenodd" clip-rule="evenodd" d="M18.865 5.12377C19.302 5.27677 19.594 5.68877 19.594 6.15177V12.9248C19.594 14.8178 18.906 16.6248 17.691 18.0248C17.08 18.7298 16.307 19.2788 15.486 19.7228L11.928 21.6448L8.364 19.7218C7.542 19.2778 6.768 18.7298 6.156 18.0238C4.94 16.6238 4.25 14.8158 4.25 12.9208V6.15177C4.25 5.68877 4.542 5.27677 4.979 5.12377L11.561 2.81077C11.795 2.72877 12.05 2.72877 12.283 2.81077L18.865 5.12377Z" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path opacity="0.4" d="M9.32251 11.9177L11.2145 13.8107L15.1125 9.91272" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;/svg&gt;</value>
+  </data>
+  <data name="پذیرش کالا" xml:space="preserve">
+    <value>&lt;svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"&gt;
+&lt;path fill-rule="evenodd" clip-rule="evenodd" d="M14.7363 2.76196H8.08431C6.02531 2.76196 4.25031 4.43096 4.25031 6.49096V17.34C4.25031 19.516 5.90831 21.115 8.08431 21.115H16.0723C18.1323 21.115 19.8023 19.4 19.8023 17.34V8.03796L14.7363 2.76196Z" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path d="M14.4736 2.75024V5.65924C14.4736 7.07924 15.6226 8.23124 17.0426 8.23424C18.3586 8.23724 19.7056 8.23824 19.7966 8.23224" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path opacity="0.4" fill-rule="evenodd" clip-rule="evenodd" d="M12.5937 10.4645C12.5937 10.0503 12.2579 9.71448 11.8437 9.71448C11.4295 9.71448 11.0937 10.0503 11.0937 10.4645V12.1642H9.39343C8.97922 12.1642 8.64343 12.5 8.64343 12.9142C8.64343 13.3284 8.97922 13.6642 9.39343 13.6642H11.0937V15.3655C11.0937 15.7797 11.4295 16.1155 11.8437 16.1155C12.2579 16.1155 12.5937 15.7797 12.5937 15.3655V13.6642H14.2944C14.7086 13.6642 15.0444 13.3284 15.0444 12.9142C15.0444 12.5 14.7086 12.1642 14.2944 12.1642H12.5937V10.4645Z" fill="#200E32"/&gt;
+&lt;/svg&gt;</value>
+  </data>
+  <data name="پیش فرض" xml:space="preserve">
+    <value>&lt;svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"&gt;
+&lt;path opacity="0.4" d="M11.9899 15.7962V11.3772" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path opacity="0.4" d="M11.9899 8.20435H11.9999" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;path fill-rule="evenodd" clip-rule="evenodd" d="M16.3346 2.75024H7.66561C4.64461 2.75024 2.75061 4.88924 2.75061 7.91624V16.0842C2.75061 19.1112 4.63561 21.2502 7.66561 21.2502H16.3336C19.3646 21.2502 21.2506 19.1112 21.2506 16.0842V7.91624C21.2506 4.88924 19.3646 2.75024 16.3346 2.75024Z" stroke="#200E32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/&gt;
+&lt;/svg&gt;</value>
+  </data>
+</root>
