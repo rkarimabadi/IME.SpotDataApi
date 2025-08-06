@@ -14,6 +14,8 @@ namespace IME.SpotDataApi.Services.Dashboard
         Task<MarketExcitementData> GetMarketExcitementAsync();
         Task<SupplyRiskData> GetSupplyRiskAsync();
         Task<MarketMoversData> GetMarketMoversAsync();
+        Task<List<MainPlayer>> GetMainPlayersAsync();
+        Task<TradingHallsData> GetTradingHallsAsync();
     }
 
     /// <summary>
@@ -395,19 +397,22 @@ namespace IME.SpotDataApi.Services.Dashboard
             var subGroups = context.SubGroups.ToDictionary(s => s.Id);
             var manufacturers = context.Manufacturers.ToDictionary(m => m.Id);
 
+
             var moversData = todayTrades
-                .Where(t => allOffers.ContainsKey(t.OfferId)) // Ensure offer exists
                 .Select(t =>
                 {
-                    var offer = allOffers[t.OfferId];
-                    var commodity = commodities.ContainsKey(offer.CommodityId) ? commodities[offer.CommodityId] : null;
-                    var subGroup = commodity != null && commodity.ParentId.HasValue && subGroups.ContainsKey(commodity.ParentId.Value) ? subGroups[commodity.ParentId.Value] : null;
-                    var manufacturer = manufacturers.ContainsKey(offer.ManufacturerId) ? manufacturers[offer.ManufacturerId] : null;
+                    var commodity = commodities.ContainsKey(t.CommodityId) ? commodities[t.CommodityId] : null;
+                    var subGroup = commodity?.ParentId.HasValue == true && subGroups.ContainsKey(commodity.ParentId.Value) ? subGroups[commodity.ParentId.Value] : null;
+                    var manufacturer = manufacturers.ContainsKey(t.ManufacturerId) ? manufacturers[t.ManufacturerId] : null;
 
-                    decimal competition = offer.InitPrice > 0 ? ((t.FinalWeightedAveragePrice - offer.InitPrice) / offer.InitPrice) * 100 : 0;
-                    decimal demandRatio = offer.InitVolume > 0 ? t.DemandVolume / offer.InitVolume : 0;
+                    // **اصلاح کلیدی**: استفاده از OfferBasePrice از خود TradeReport
+                    decimal competition = ((t.FinalWeightedAveragePrice - t.OfferBasePrice) / t.OfferBasePrice) * 100;
 
-                    return new {
+                    // **اصلاح کلیدی**: استفاده از OfferVolume از خود TradeReport
+                    decimal demandRatio = t.OfferVolume > 0 ? t.DemandVolume / t.OfferVolume : 0;
+
+                    return new
+                    {
                         SubGroupName = subGroup?.PersianName ?? "نامشخص",
                         ManufacturerName = manufacturer?.PersianName ?? "نامشخص",
                         Competition = competition,
@@ -416,31 +421,51 @@ namespace IME.SpotDataApi.Services.Dashboard
                 })
                 .ToList();
 
-            var competitionItems = moversData
-                .OrderByDescending(d => d.Competition)
-                .Take(2)
-                .Select((d, index) => new MarketMoverItem
+            // --- منطق انتخاب آیتم‌های رقابت با زیرگروه‌های یکتا ---
+            var competitionItems = new List<MarketMoverItem>();
+            var usedCompetitionSubGroups = new HashSet<string>();
+            foreach (var item in moversData.OrderByDescending(d => d.Competition))
+            {
+                if (item.SubGroupName != "نامشخص" && !usedCompetitionSubGroups.Contains(item.SubGroupName))
                 {
-                    Rank = index + 1,
-                    Title = d.SubGroupName,
-                    Subtitle = d.ManufacturerName,
-                    Value = $"+{d.Competition:F1}%",
-                    ValueState = ValueState.Positive
-                })
-                .ToList();
+                    competitionItems.Add(new MarketMoverItem
+                    {
+                        Title = item.SubGroupName,
+                        Subtitle = item.ManufacturerName,
+                        Value = $"+{item.Competition:F1}%",
+                        ValueState = ValueState.Positive
+                    });
+                    usedCompetitionSubGroups.Add(item.SubGroupName);
+                    if (competitionItems.Count == 2) break;
+                }
+            }
+            for (int i = 0; i < competitionItems.Count; i++)
+            {
+                competitionItems[i].Rank = i + 1;
+            }
 
-            var demandItems = moversData
-                .OrderByDescending(d => d.DemandRatio)
-                .Take(2)
-                .Select((d, index) => new MarketMoverItem
+            // --- منطق انتخاب آیتم‌های تقاضا با زیرگروه‌های یکتا ---
+            var demandItems = new List<MarketMoverItem>();
+            var usedDemandSubGroups = new HashSet<string>();
+            foreach (var item in moversData.OrderByDescending(d => d.DemandRatio))
+            {
+                if (item.SubGroupName != "نامشخص" && !usedDemandSubGroups.Contains(item.SubGroupName))
                 {
-                    Rank = index + 1,
-                    Title = d.SubGroupName,
-                    Subtitle = d.ManufacturerName,
-                    Value = $"{d.DemandRatio:F1}x",
-                    ValueState = ValueState.Neutral
-                })
-                .ToList();
+                    demandItems.Add(new MarketMoverItem
+                    {
+                        Title = item.SubGroupName,
+                        Subtitle = item.ManufacturerName,
+                        Value = $"{item.DemandRatio:F1}x",
+                        ValueState = ValueState.Neutral
+                    });
+                    usedDemandSubGroups.Add(item.SubGroupName);
+                    if (demandItems.Count == 2) break;
+                }
+            }
+            for (int i = 0; i < demandItems.Count; i++)
+            {
+                demandItems[i].Rank = i + 1;
+            }
 
             return new MarketMoversData
             {
@@ -449,5 +474,164 @@ namespace IME.SpotDataApi.Services.Dashboard
             };
         }
         #endregion MarketMovers
+
+        #region MainPlayers
+        public async Task<List<MainPlayer>> GetMainPlayersAsync()
+        {
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            using var context = _contextFactory.CreateDbContext();
+            
+            var allTrades = context.TradeReports.ToList();
+            var todayTrades = allTrades.Where(t => t.TradeDate == todayPersian).ToList();
+
+            if (!todayTrades.Any())
+            {
+                return new List<MainPlayer>();
+            }
+
+            var mainPlayers = new List<MainPlayer>();
+            var totalMarketValue = todayTrades.Sum(t => t.TradeValue);
+
+            if (totalMarketValue == 0)
+            {
+                return new List<MainPlayer>();
+            }
+
+            // --- برترین عرضه‌کننده ---
+            var topSupplierData = todayTrades
+                .GroupBy(t => t.SupplierId)
+                .Select(g => new { SupplierId = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
+                .OrderByDescending(s => s.TotalValue)
+                .FirstOrDefault();
+
+            if (topSupplierData != null)
+            {
+                var suppliers = context.Suppliers.ToDictionary(s => s.Id);
+                var topSupplierName = suppliers.ContainsKey(topSupplierData.SupplierId) ? suppliers[topSupplierData.SupplierId].PersianName : "نامشخص";
+                
+                mainPlayers.Add(new MainPlayer
+                {
+                    Type = "برترین عرضه‌کننده",
+                    Name = topSupplierName,
+                    IconCssClass = "bi bi-buildings-fill",
+                    MarketShare = (topSupplierData.TotalValue / totalMarketValue) * 100
+                });
+            }
+
+            // --- برترین کارگزار (فروشنده) ---
+            var topBrokerData = todayTrades
+                .GroupBy(t => t.SellerBrokerId)
+                .Select(g => new { BrokerId = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
+                .OrderByDescending(b => b.TotalValue)
+                .FirstOrDefault();
+
+            if (topBrokerData != null)
+            {
+                var brokers = context.Brokers.ToDictionary(b => b.Id);
+                var topBrokerName = brokers.ContainsKey(topBrokerData.BrokerId) ? brokers[topBrokerData.BrokerId].PersianName : "نامشخص";
+
+                mainPlayers.Add(new MainPlayer
+                {
+                    Type = "برترین کارگزار",
+                    Name = topBrokerName,
+                    IconCssClass = "bi bi-person-workspace",
+                    MarketShare = (topBrokerData.TotalValue / totalMarketValue) * 100
+                });
+            }
+
+            return mainPlayers;
+        }
+        #endregion MainPlayers
+
+        #region TradingHalls
+        public async Task<TradingHallsData> GetTradingHallsAsync()
+        {
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            using var context = _contextFactory.CreateDbContext();          
+            
+            var allTrades = context.TradeReports.ToList();
+            var todayTrades = allTrades.Where(t => t.TradeDate == todayPersian).ToList();
+
+            if (!todayTrades.Any())
+            {
+                return new TradingHallsData { Items = new List<TradingHallItem>() };
+            }
+
+            var allOffers = context.Offers.ToDictionary(o => o.Id);
+            var allHalls = context.TradingHalls.ToDictionary(h => h.Id);
+
+            var hallsData = todayTrades
+                .Where(t => allOffers.ContainsKey(t.OfferId))
+                .GroupBy(t => allOffers[t.OfferId].TradingHallId)
+                .Select(g =>
+                {
+                    var hallId = g.Key;
+                    var hallTrades = g.ToList();
+                    var hallOffers = hallTrades.Select(t => allOffers[t.OfferId]).Distinct();
+
+                    var totalValue = hallTrades.Sum(t => t.TradeValue * 1000);
+                    var totalTradedVolume = hallTrades.Sum(t => t.TradeVolume);
+                    var totalOfferedVolume = hallOffers.Sum(o => o.OfferVol);
+                    var absorptionRate = totalOfferedVolume > 0 ? (totalTradedVolume / totalOfferedVolume) * 100 : 0;
+
+                    return new
+                    {
+                        HallId = hallId,
+                        TotalValue = totalValue,
+                        AbsorptionRate = absorptionRate
+                    };
+                })
+                .Where(h => allHalls.ContainsKey(h.HallId)) // Filter out halls that are not in the main list
+                .ToList();
+
+            var items = hallsData
+                .OrderByDescending(h => h.TotalValue)
+                .Select(h =>
+            {
+                var hallInfo = allHalls[h.HallId];
+                var (icon, bgClass) = GetHallVisuals(hallInfo.PersianName);
+                
+                ValueState state;
+                if (h.AbsorptionRate > 85) state = ValueState.Positive;
+                else if (h.AbsorptionRate > 60) state = ValueState.Neutral;
+                else state = ValueState.Negative;
+
+                return new TradingHallItem
+                {
+                    Title = hallInfo.PersianName,
+                    IconCssClass = icon,
+                    IconBgCssClass = bgClass,
+                    Value = FormatLargeNumber(h.TotalValue),
+                    Change = $"{h.AbsorptionRate:F0}% جذب",
+                    ChangeState = state
+                };
+            })
+            .OrderByDescending(i => i.Value)
+            .ToList();
+
+            return new TradingHallsData { Items = items };
+        }
+
+        private (string IconCssClass, string IconBgCssClass) GetHallVisuals(string hallName)
+        {
+            if (hallName.Contains("صنعتی")) return ("bi bi-building", "industrial");
+            if (hallName.Contains("پتروشیمی")) return ("bi bi-droplet-fill", "petro");
+            if (hallName.Contains("کشاورزی")) return ("bi bi-tree-fill", "agri");
+            if (hallName.Contains("نفتی")) return ("bi bi-fuel-pump-fill", "oil-prod");
+            if (hallName.Contains("سیمان")) return ("bi bi-stack", "industrial");
+            if (hallName.Contains("خودرو")) return ("bi bi-car-front-fill", "auto");
+            if (hallName.Contains("طلا")) return ("bi bi-coin", "gold");
+            if (hallName.Contains("صادراتی")) return ("bi bi-globe-americas", "export");
+            if (hallName.Contains("حراج")) return ("bi bi-hammer", "auction");
+            if (hallName.Contains("املاک")) return ("bi bi-house-door-fill", "real-estate");
+            if (hallName.Contains("پریمیوم")) return ("bi bi-gem", "premium");
+            if (hallName.Contains("مناقصه")) return ("bi bi-file-earmark-text-fill", "tender");
+
+            // مقدار پیش‌فرض برای سایر تالارها
+            return ("bi bi-grid-fill", "other");
+        }
+        #endregion TradingHalls
     }
 }

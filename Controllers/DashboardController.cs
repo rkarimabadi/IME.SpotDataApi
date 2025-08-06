@@ -115,41 +115,43 @@ namespace IME.SpotDataApi.Controllers
         
         [HttpGet("main-players")]
         [ProducesResponseType(typeof(IEnumerable<MainPlayer>), 200)]
-        public IActionResult GetMainPlayers()
+        public async Task<IActionResult> GetMainPlayers()
         {
-            var data = new List<MainPlayer>
-            {
-                new()
-                {
-                    Type = "برترین کارگزار",
-                    Name = "کارگزاری مفید",
-                    IconCssClass = "bi bi-person-workspace",
-                    MarketShare = 18.4m
-                },
-                new()
-                {
-                    Type = "برترین عرضه‌کننده",
-                    Name = "فولاد مبارکه",
-                    IconCssClass = "bi bi-buildings-fill",
-                    MarketShare = 25.1m
-                }
-            };
+            //var data = new List<MainPlayer>
+            //{
+            //    new()
+            //    {
+            //        Type = "برترین کارگزار",
+            //        Name = "کارگزاری مفید",
+            //        IconCssClass = "bi bi-person-workspace",
+            //        MarketShare = 18.4m
+            //    },
+            //    new()
+            //    {
+            //        Type = "برترین عرضه‌کننده",
+            //        Name = "فولاد مبارکه",
+            //        IconCssClass = "bi bi-buildings-fill",
+            //        MarketShare = 25.1m
+            //    }
+            //};
+            var data = await _dashboardService.GetMainPlayersAsync();
             return Ok(data);
         }
 
         [HttpGet("trading-halls")]
         [ProducesResponseType(typeof(TradingHallsData), 200)]
-        public IActionResult GetTradingHalls()
+        public async Task<IActionResult> GetTradingHalls()
         {
-            var data = new TradingHallsData
-            {
-                Items = new List<TradingHallItem>
-                {
-                    new() { Title = "صنعتی", IconCssClass = "bi bi-building", IconBgCssClass = "industrial", Value = "۵.۸ همت", Change = "+۳.۱٪", ChangeState = ValueState.Positive },
-                    new() { Title = "پتروشیمی", IconCssClass = "bi bi-droplet-fill", IconBgCssClass = "petro", Value = "۴.۲ همت", Change = "-۱.۲٪", ChangeState = ValueState.Negative },
-                    new() { Title = "کشاورزی", IconCssClass = "bi bi-tree-fill", IconBgCssClass = "agri", Value = "۰.۹ همت", Change = "+۵.۴٪", ChangeState = ValueState.Positive }
-                }
-            };
+            //var data = new TradingHallsData
+            //{
+            //    Items = new List<TradingHallItem>
+            //    {
+            //        new() { Title = "صنعتی", IconCssClass = "bi bi-building", IconBgCssClass = "industrial", Value = "۵.۸ همت", Change = "+۳.۱٪", ChangeState = ValueState.Positive },
+            //        new() { Title = "پتروشیمی", IconCssClass = "bi bi-droplet-fill", IconBgCssClass = "petro", Value = "۴.۲ همت", Change = "-۱.۲٪", ChangeState = ValueState.Negative },
+            //        new() { Title = "کشاورزی", IconCssClass = "bi bi-tree-fill", IconBgCssClass = "agri", Value = "۰.۹ همت", Change = "+۵.۴٪", ChangeState = ValueState.Positive }
+            //    }
+            //};
+            var data = await _dashboardService.GetTradingHallsAsync();
             return Ok(data);
         }
 
