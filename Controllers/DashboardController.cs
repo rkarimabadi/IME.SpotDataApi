@@ -51,62 +51,65 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("market-excitement")]
         [ProducesResponseType(typeof(MarketExcitementData), 200)]
-        public IActionResult GetMarketExcitement()
+        public async Task<IActionResult> GetMarketExcitement()
         {
-            var data =  new MarketExcitementData
-            {
-                Title = "تقاضای بالا",
-                Description = "بخش عمده معاملات امروز به روش حراج باز انجام شده که نشان‌دهنده رقابت شدید و هیجان در بازار است.",
-                Percentage = 70,
-                Label = "حراج"
-            };
+            //var data =  new MarketExcitementData
+            //{
+            //    Title = "تقاضای بالا",
+            //    Description = "بخش عمده معاملات امروز به روش حراج باز انجام شده که نشان‌دهنده رقابت شدید و هیجان در بازار است.",
+            //    Percentage = 70,
+            //    Label = "حراج"
+            //};
+            var data = await _dashboardService.GetMarketExcitementAsync();
             return Ok(data);
         }
 
         [HttpGet("supply-risk")]
         [ProducesResponseType(typeof(SupplyRiskData), 200)]
-        public IActionResult GetSupplyRisk()
+        public async Task<IActionResult> GetSupplyRisk()
         {
-            var data = new SupplyRiskData
-            {
-                Items = new List<SupplyRiskItem>
-                {
-                    new()
-                    {
-                        Title = "مس کاتد",
-                        Subtitle = "ریسک بالا",
-                        RiskLevel = RiskLevel.High,
-                        Value = "۱ عرضه‌کننده"
-                    },
-                    new()
-                    {
-                        Title = "میلگرد",
-                        Subtitle = "ریسک پایین",
-                        RiskLevel = RiskLevel.Low,
-                        Value = "۱۲ عرضه‌کننده"
-                    }
-                }
-            };
+            //var data = new SupplyRiskData
+            //{
+            //    Items = new List<SupplyRiskItem>
+            //    {
+            //        new()
+            //        {
+            //            Title = "مس کاتد",
+            //            Subtitle = "ریسک بالا",
+            //            RiskLevel = RiskLevel.High,
+            //            Value = "۱ عرضه‌کننده"
+            //        },
+            //        new()
+            //        {
+            //            Title = "میلگرد",
+            //            Subtitle = "ریسک پایین",
+            //            RiskLevel = RiskLevel.Low,
+            //            Value = "۱۲ عرضه‌کننده"
+            //        }
+            //    }
+            //};
+            var data = await _dashboardService.GetSupplyRiskAsync();
             return Ok(data);
         }
 
         [HttpGet("market-movers")]
         [ProducesResponseType(typeof(MarketMoversData), 200)]
-        public IActionResult GetMarketMovers()
+        public async Task<IActionResult> GetMarketMovers()
         {
-            var data = new MarketMoversData
-            {
-                CompetitionItems = new List<MarketMoverItem>
-                {
-                    new() { Rank = 1, Title = "ورق گالوانیزه", Subtitle = "فولاد مبارکه", Value = "+۱۲.۵٪", ValueState = ValueState.Positive },
-                    new() { Rank = 2, Title = "مس کاتد", Subtitle = "شرکت ملی مس", Value = "+۹.۸٪", ValueState = ValueState.Positive }
-                },
-                DemandItems = new List<MarketMoverItem>
-                {
-                    new() { Rank = 1, Title = "سیمان تیپ ۲", Subtitle = "سیمان تهران", Value = "۳.۵x", ValueState = ValueState.Neutral },
-                    new() { Rank = 2, Title = "پلی‌پروپیلن", Subtitle = "پتروشیمی مارون", Value = "۲.۸x", ValueState = ValueState.Neutral }
-                }
-            };
+            //var data = new MarketMoversData
+            //{
+            //    CompetitionItems = new List<MarketMoverItem>
+            //    {
+            //        new() { Rank = 1, Title = "ورق گالوانیزه", Subtitle = "فولاد مبارکه", Value = "+۱۲.۵٪", ValueState = ValueState.Positive },
+            //        new() { Rank = 2, Title = "مس کاتد", Subtitle = "شرکت ملی مس", Value = "+۹.۸٪", ValueState = ValueState.Positive }
+            //    },
+            //    DemandItems = new List<MarketMoverItem>
+            //    {
+            //        new() { Rank = 1, Title = "سیمان تیپ ۲", Subtitle = "سیمان تهران", Value = "۳.۵x", ValueState = ValueState.Neutral },
+            //        new() { Rank = 2, Title = "پلی‌پروپیلن", Subtitle = "پتروشیمی مارون", Value = "۲.۸x", ValueState = ValueState.Neutral }
+            //    }
+            //};
+            var data = await _dashboardService.GetMarketMoversAsync();
             return Ok(data);
         }
         
