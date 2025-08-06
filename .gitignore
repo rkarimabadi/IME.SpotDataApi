@@ -364,3 +364,6 @@ FodyWeavers.xsd
 /appsettings.json
 /appsettings.Development.json
 /appsettings.Production.json
+/App_Data/local_data.db
+/App_Data/local_data.db-shm
+/App_Data/local_data.db-wal
