@@ -20,9 +20,6 @@ namespace IME.SpotDataApi.Controllers
         [ProducesResponseType(typeof(MarketPulseData), 200)]
         public async Task<IActionResult> GetMarketPulse()
         {
-            var data = await _dashboardService.GetMarketPulseAsync();
-            return Ok(data);
-            //// داده‌های ساختگی برای نمونه
             //var data = new MarketPulseData
             //{
             //    Items = new List<PulseCardItem>
@@ -31,22 +28,24 @@ namespace IME.SpotDataApi.Controllers
             //        new() { Title = "شاخص رقابت", Value = "۸.۲٪", Change = "-۰.۳٪", ChangeState = ValueState.Negative }
             //    }
             //};
-            //return Ok(data);
+            var data = await _dashboardService.GetMarketPulseAsync();
+            return Ok(data);
         }
 
         [HttpGet("market-sentiment")]
         [ProducesResponseType(typeof(MarketSentimentData), 200)]
-        public IActionResult GetMarketSentiment()
+        public async Task<IActionResult> GetMarketSentiment()
         {
-            var data = new MarketSentimentData
-            {
-                Items = new List<SentimentItem>
-                {
-                    new() { Name = "نقدی", Percentage = 65, ColorCssVariable = "var(--primary-color)" },
-                    new() { Name = "سلف", Percentage = 25, ColorCssVariable = "var(--success-color)" },
-                    new() { Name = "نسیه", Percentage = 10, ColorCssVariable = "var(--warning-color)" }
-                }
-            };
+            //var data = new MarketSentimentData
+            //{
+            //    Items = new List<SentimentItem>
+            //    {
+            //        new() { Name = "نقدی", Percentage = 65, ColorCssVariable = "var(--primary-color)" },
+            //        new() { Name = "سلف", Percentage = 25, ColorCssVariable = "var(--success-color)" },
+            //        new() { Name = "نسیه", Percentage = 10, ColorCssVariable = "var(--warning-color)" }
+            //    }
+            //};
+            var data = await _dashboardService.GetMarketSentimentAsync();
             return Ok(data);
         }
 

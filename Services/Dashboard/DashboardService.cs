@@ -10,6 +10,7 @@ namespace IME.SpotDataApi.Services.Dashboard
     public interface IDashboardService
     {
         Task<MarketPulseData> GetMarketPulseAsync();
+        Task<MarketSentimentData> GetMarketSentimentAsync();
     }
 
     /// <summary>
@@ -33,10 +34,11 @@ namespace IME.SpotDataApi.Services.Dashboard
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
             using var context = _contextFactory.CreateDbContext();
+            
             var allOffers = context.Offers.ToList();
-            var allTrades = context.TradeReports.ToList();
-
             var todayOffers = allOffers.Where(o => o.OfferDate == todayPersian).ToList();
+            
+            var allTrades = context.TradeReports.ToList();
             var todayTrades = allTrades.Where(t => t.TradeDate == todayPersian).ToList();
 
             var realizationItem = CreateRealizationRatioItem(todayOffers, todayTrades);
@@ -98,5 +100,73 @@ namespace IME.SpotDataApi.Services.Dashboard
             var hemtValue = (value * 10000) / 10_000_000_000_000M;
             return $"{hemtValue:F1} همت";
         }
+
+        #region MarketSentiment
+        public async Task<MarketSentimentData> GetMarketSentimentAsync()
+        {            
+            using var context = _contextFactory.CreateDbContext();          
+         
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            var allOffers = context.Offers.ToList();
+            var todayOffers = allOffers.Where(o => o.OfferDate == todayPersian).ToList();
+
+            if (todayOffers.Count == 0)
+            {
+                return new MarketSentimentData { Items = [] };
+            }
+
+            var totalValue = todayOffers.Sum(o => o.InitPrice * o.OfferVol);
+            if (totalValue == 0)
+            {
+                 return new MarketSentimentData { Items = [] };
+            }
+
+            var valueByCategory = todayOffers
+                .GroupBy(o => GetContractCategory(o.ContractTypeId))
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Sum(o => o.InitPrice * o.OfferVol)
+                );
+
+            var items = new List<SentimentItem>();
+            var categories = new List<(string Name, string Color)>
+            {
+                ("نقدی", "var(--primary-color)"),
+                ("سلف", "var(--success-color)"),
+                ("نسیه", "var(--warning-color)"),
+                ("پریمیوم", "var(--info-color)")
+            };
+
+            foreach (var category in categories)
+            {
+                var categoryValue = valueByCategory.TryGetValue(category.Name, out decimal value) ? value : 0;
+                var percentage = (int)Math.Round((categoryValue / totalValue) * 100);
+                if (percentage > 0)
+                {
+                    items.Add(new SentimentItem
+                    {
+                        Name = category.Name,
+                        Percentage = percentage,
+                        ColorCssVariable = category.Color
+                    });
+                }
+            }
+            
+            return new MarketSentimentData { Items = [.. items.OrderByDescending(i => i.Percentage)] };
+        }
+
+        private string GetContractCategory(int contractTypeId)
+        {
+            return contractTypeId switch
+            {
+                1 or 4 or 5 or 7 or 9 or 10 or 11 or 12 or 13 or 14 or 17 or 24 or 25 or 27 or 28 or 30 => "نقدی",
+                2 or 8 or 16 or 18 or 19 => "سلف",
+                3 or 15 or 20 or 21 or 31 or 33 or 34 => "نسیه",
+                29 or 32 or 35 or 36 => "پریمیوم",
+                _ => "سایر"
+            };
+        }
+
+        #endregion MarketSentiment
     }
 }
