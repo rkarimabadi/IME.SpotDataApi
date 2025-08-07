@@ -367,3 +367,5 @@ FodyWeavers.xsd
 /App_Data/local_data.db
 /App_Data/local_data.db-shm
 /App_Data/local_data.db-wal
+*.dll
+*.xml
