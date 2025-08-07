@@ -11,7 +11,7 @@ namespace IME.SpotDataApi.Services.RemoteData
     {
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
-        public string EndPointPath { get; set; } = "/GetNewsNotificationsByDate";
+        public string EndPointPath { get; set; } = "api/Notifications/NewsNotificationsByDate";
 
         public NotificationService(IHttpClientFactory httpClientFactory, IOptions<ApiEndpoints> apiEndpoints)
         {
