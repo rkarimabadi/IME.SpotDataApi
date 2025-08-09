@@ -16,6 +16,7 @@ namespace IME.SpotDataApi.Services.Dashboard
         Task<MarketMoversData> GetMarketMoversAsync();
         Task<List<MainPlayer>> GetMainPlayersAsync();
         Task<TradingHallsData> GetTradingHallsAsync();
+        Task<MarketProgressData> GetMarketProgressAsync();
     }
 
     /// <summary>
@@ -633,5 +634,78 @@ namespace IME.SpotDataApi.Services.Dashboard
             return ("bi bi-grid-fill", "other");
         }
         #endregion TradingHalls
+
+        #region MarketProgress
+        public async Task<MarketProgressData> GetMarketProgressAsync()
+        {
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            using var context = _contextFactory.CreateDbContext();
+            
+            var allOffers = context.Offers.ToList();
+            var todayOffers = allOffers.Where(o => o.OfferDate == todayPersian).ToList();
+
+            var allTrades = context.TradeReports.ToList();
+            var todayTrades = allTrades.Where(t => t.TradeDate == todayPersian).Select(t => t.OfferId)
+                .ToHashSet();
+
+            var commodities = context.Commodities.ToDictionary(c => c.Id);
+            var subGroups = context.SubGroups.ToDictionary(s => s.Id);
+            var groups = context.Groups.ToDictionary(g => g.Id);
+            var mainGroups = context.MainGroups.ToDictionary(m => m.Id);
+
+            var progressItems = todayOffers
+                .Select(offer =>
+                {
+                    // Build the hierarchy chain
+                    var commodity = commodities.GetValueOrDefault(offer.CommodityId);
+                    var subGroup = commodity?.ParentId.HasValue == true ? subGroups.GetValueOrDefault(commodity.ParentId.Value) : null;
+                    var group = subGroup?.ParentId.HasValue == true ? groups.GetValueOrDefault(subGroup.ParentId.Value) : null;
+                    var mainGroup = group?.ParentId.HasValue == true ? mainGroups.GetValueOrDefault(group.ParentId.Value) : null;
+                    
+                    return new { Offer = offer, MainGroup = mainGroup };
+                })
+                .Where(x => x.MainGroup != null) // Only consider offers with a valid main group
+                .GroupBy(x => x.MainGroup)
+                .Select(g =>
+                {
+                    var mainGroup = g.Key;
+                    var offersInGroup = g.Select(x => x.Offer).ToList();
+                    var tradedCount = offersInGroup.Count(o => todayTrades.Contains(o.Id));
+
+                    return new MarketProgressDetail
+                    {
+                        Name = mainGroup.PersianName,
+                        TotalOffers = offersInGroup.Count,
+                        TradedOffers = tradedCount,
+                        CssClass = GetMainGroupCssClass(mainGroup.PersianName)
+                    };
+                })
+                .OrderByDescending(d => d.TotalOffers)
+                .ToList();
+
+            return new MarketProgressData { Items = progressItems };
+        }
+
+        private string GetMainGroupCssClass(string mainGroupName)
+        {
+            if (mainGroupName.Contains("صنعتی")) return "industrial";
+            if (mainGroupName.Contains("پتروشیمی")) return "petro";
+            if (mainGroupName.Contains("کشاورزی")) return "agri";
+            if (mainGroupName.Contains("نفتی")) return "oil-prod";
+            if (mainGroupName.Contains("سیمان")) return  "industrial";
+            if (mainGroupName.Contains("خودرو")) return "auto";
+            if (mainGroupName.Contains("طلا")) return "gold";
+            if (mainGroupName.Contains("صادراتی")) return "export";
+            if (mainGroupName.Contains("حراج")) return "auction";
+            if (mainGroupName.Contains("املاک")) return "real-estate";
+            if (mainGroupName.Contains("پریمیوم")) return "premium";
+            if (mainGroupName.Contains("مناقصه")) return "tender";
+            return "other";
+        }
+
+
+
+        #endregion MarketProgress
     }
 }

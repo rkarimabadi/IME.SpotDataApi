@@ -188,5 +188,22 @@ namespace IME.SpotDataApi.Controllers
             };     
             return Ok(data);
         }
+        [HttpGet("market-progress")]
+        [ProducesResponseType(typeof(MarketProgressData), 200)]
+        public async Task<IActionResult> GetMarketProgress()
+        {
+            //var data = new MarketProgressData()
+            //{
+            //    Items =
+            //    [
+            //        new() { Name ="صنعتی",TotalOffers = 80, TradedOffers = 75, CssClass = "industrial"},
+            //        new() {Name ="پتروشیمی",TotalOffers = 60, TradedOffers = 40,CssClass= "petro"},
+            //        new() {Name ="کشاورزی",TotalOffers = 40, TradedOffers = 10,CssClass = "agri"},
+            //        new() {Name ="فرآورده های نفتی",TotalOffers = 30, TradedOffers = 3, CssClass = "oil"}
+            //    ]
+            //};
+            var data = await _dashboardService.GetMarketProgressAsync();
+            return Ok(data);
+        }
     }
 }

@@ -12,7 +12,6 @@ namespace IME.SpotDataApi.Services.RemoteData
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _jsonOptions;
         public string EndPointPath { get; set; } = "api/Notifications/NewsNotificationsByDate";
-        public string spotNotificationEndPointPath { get; set; } = "/api/Notifications/SpotNotificationsByDate";
 
         public NotificationService(IHttpClientFactory httpClientFactory, IOptions<ApiEndpoints> apiEndpoints)
         {
@@ -26,37 +25,6 @@ namespace IME.SpotDataApi.Services.RemoteData
         {
             return await RetrieveAsync(date, date);
         }
-        public async Task<IEnumerable<T>> RetrieveSpotNotoficationsAsync(DateTime fromDate, DateTime toDate)
-        {
-            if (fromDate > toDate)
-            {
-                return Enumerable.Empty<T>();
-            }
-
-            var requestPayload = new NotificationRequest
-            {
-                FromDate = fromDate.ToString("yyyy-MM-dd", CultureInfo.GetCultureInfo("en-US")),
-                ToDate = toDate.ToString("yyyy-MM-dd", CultureInfo.GetCultureInfo("en-US")),
-                PageNumber = 1,
-                PageSize = 1000
-            };
-
-            try
-            {
-                var response = await _httpClient.PostAsJsonAsync(spotNotificationEndPointPath, requestPayload);
-                response.EnsureSuccessStatusCode(); // Throws an exception if the response is not successful
-
-                var result = await response.Content.ReadFromJsonAsync<NotificationResponse<T>>(_jsonOptions);
-                return result?.Data ?? Enumerable.Empty<T>();
-            }
-            catch (HttpRequestException ex)
-            {
-                // Log the exception (using a proper logging framework)
-                Console.WriteLine($"Error fetching spot notifications: {ex.Message}");
-                return Enumerable.Empty<T>();
-            }
-        }
-
         public async Task<IEnumerable<T>> RetrieveAsync(DateTime fromDate, DateTime toDate)
         {
             if (fromDate > toDate)
