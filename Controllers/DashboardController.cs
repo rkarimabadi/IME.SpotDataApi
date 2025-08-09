@@ -188,6 +188,37 @@ namespace IME.SpotDataApi.Controllers
             };     
             return Ok(data);
         }
+        [HttpGet("spot-notifications")]
+        [ProducesResponseType(typeof(SpotNotificationData), 200)]
+        public async Task<IActionResult> GetspotNotifications()
+        {
+            //var data = new SpotNotificationData
+            //{
+            //    Items = new List<SpotNotificationItem>
+            //    {
+            //        new()
+            //        {
+            //            Category = SpotNotificationCategory.Amendment,
+            //            Source = "گروه داغ • فولاد",
+            //            Title = "افزایش تقاضا برای ورق سرد، قیمت‌ها را در گروه فولاد بالا برد"
+            //        },
+            //        new()
+            //        {
+            //            Category = SpotNotificationCategory.LicenseRenewal,
+            //            Source = "اطلاعیه عرضه",
+            //            Title = "عرضه جدید سیمان تیپ ۲ تهران برای هفته آینده تایید شد"
+            //        },
+            //        new()
+            //        {
+            //            Category = SpotNotificationCategory.ProductAcceptance,
+            //            Source = "گروه داغ • پتروشیمی",
+            //            Title = "رقابت سنگین بر سر پلیمرهای مهندسی در تالار پتروشیمی"
+            //        }
+            //    }
+            //};
+            var data = await _dashboardService.GetSpotNotificationsAsync();
+            return Ok(data);
+        }
         [HttpGet("market-progress")]
         [ProducesResponseType(typeof(MarketProgressData), 200)]
         public async Task<IActionResult> GetMarketProgress()

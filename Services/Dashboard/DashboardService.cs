@@ -17,6 +17,7 @@ namespace IME.SpotDataApi.Services.Dashboard
         Task<List<MainPlayer>> GetMainPlayersAsync();
         Task<TradingHallsData> GetTradingHallsAsync();
         Task<MarketProgressData> GetMarketProgressAsync();
+        Task<SpotNotificationData> GetSpotNotificationsAsync();
     }
 
     /// <summary>
@@ -37,33 +38,36 @@ namespace IME.SpotDataApi.Services.Dashboard
         #region MarketPulse
         public async Task<MarketPulseData> GetMarketPulseAsync()
         {
+             using var context = _contextFactory.CreateDbContext();
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
-
-            using var context = _contextFactory.CreateDbContext();
             
             var allOffers = context.Offers.ToList();
             var todayOffers = allOffers.Where(o => o.OfferDate == todayPersian).ToList();
-            
+
             var allTrades = context.TradeReports.ToList();
             var todayTrades = allTrades.Where(t => t.TradeDate == todayPersian).ToList();
 
             var realizationItem = CreateRealizationRatioItem(todayOffers, todayTrades);
             var demandStrengthItem = CreateDemandStrengthRatioItem(todayOffers, todayTrades);
+
             return new MarketPulseData
             {
                 Items = new List<PulseCardItem> { realizationItem, demandStrengthItem }
             };
         }
+        
+        #region MarketPulse Helpers
 
         /// <summary>
         /// آیتم کارت "پتانسیل بازار" (نسبت تحقق) را ایجاد می‌کند.
         /// </summary>
         private PulseCardItem CreateRealizationRatioItem(List<Offer> todayOffers, List<TradeReport> todayTrades)
         {
-            // محاسبه ارزش بالقوه بر اساس قیمت پایه و حجم عرضه
-            decimal potentialValue = todayOffers.Sum(o => o.InitPrice * o.OfferVol);
-            // محاسبه ارزش محقق شده بر اساس ارزش معامله گزارش شده (ضرب در ۱۰۰۰)
-            decimal realizedValue = todayTrades.Sum(t => t.TradeValue); //todayTrades.Sum(t => t.TradeValue * 1000);
+            // **اصلاح کلیدی**: ضرب حجم عرضه (تن) در ۱۰۰۰ برای تبدیل به کیلوگرم و تطابق با واحد قیمت
+            decimal potentialValue = todayOffers.Sum(o => o.InitPrice * (o.OfferVol * 1000));
+            
+            // محاسبه ارزش محقق شده (ضرب در ۱۰۰۰ برای تبدیل هزار ریال به ریال)
+            decimal realizedValue = todayTrades.Sum(t => t.TradeValue * 1000);
             decimal realizationRatio = potentialValue > 0 ? (realizedValue / potentialValue) * 100 : 0;
 
             return new PulseCardItem
@@ -71,18 +75,19 @@ namespace IME.SpotDataApi.Services.Dashboard
                 Title = "پتانسیل بازار",
                 Value = FormatLargeNumber(realizedValue),
                 Change = $"{realizationRatio:F1}%",
+                ChangeLabel = "نرخ تحقق",
                 ChangeState = realizationRatio > 50 ? ValueState.Positive : (realizationRatio < 50 && realizationRatio > 0 ? ValueState.Negative : ValueState.Neutral)
             };
         }
-
         
         /// <summary>
         /// آیتم کارت "نسبت قدرت تقاضا" را ایجاد می‌کند.
         /// </summary>
         private PulseCardItem CreateDemandStrengthRatioItem(List<Offer> todayOffers, List<TradeReport> todayTrades)
         {
-            // محاسبه حجم کل عرضه اولیه
-            decimal totalInitialSupply = todayOffers.Sum(o => o.InitVolume);
+            // **اصلاح**: استفاده از OfferVol برای یکپارچگی با سایر محاسبات
+            decimal totalInitialSupply = todayOffers.Sum(o => o.OfferVol);
+            
             // محاسبه حجم کل تقاضای ثبت شده
             decimal totalRegisteredDemand = todayTrades.Sum(t => t.DemandVolume);
             decimal demandStrengthRatio = totalInitialSupply > 0 ? totalRegisteredDemand / totalInitialSupply : 0;
@@ -92,6 +97,7 @@ namespace IME.SpotDataApi.Services.Dashboard
                 Title = "نسبت قدرت تقاضا",
                 Value = $"{totalRegisteredDemand:N0} تن",
                 Change = $"x{demandStrengthRatio:F2}",
+                ChangeLabel = "ضریب تقاضا",
                 ChangeState = demandStrengthRatio > 1 ? ValueState.Positive : (demandStrengthRatio < 1 && demandStrengthRatio > 0 ? ValueState.Negative : ValueState.Neutral)
             };
         }
@@ -99,13 +105,15 @@ namespace IME.SpotDataApi.Services.Dashboard
         /// <summary>
         /// یک عدد بزرگ (به ریال) را به فرمت "همت" تبدیل می‌کند.
         /// </summary>
-        private string FormatLargeNumber(decimal value)
+        private string FormatLargeNumber(decimal valueInRials)
         {
-            if (value == 0) return "۰";
+            if (valueInRials == 0) return "۰";
             // 1 همت = 10,000,000,000,000 ریال
-            var hemtValue = (value * 10000) / 10_000_000_000_000M;
+            var hemtValue = valueInRials / 10_000_000_000_000M;
             return $"{hemtValue:F1} همت";
         }
+
+        #endregion
 
         #endregion MarketPulse
 
@@ -160,6 +168,19 @@ namespace IME.SpotDataApi.Services.Dashboard
                 }
             }
             
+            var sortedItems = items.OrderByDescending(i => i.Percentage).ToList();
+
+            // **اصلاح کلیدی**: تضمین اینکه مجموع درصدها ۱۰۰ شود
+            if (sortedItems.Any())
+            {
+                var currentSum = sortedItems.Sum(i => i.Percentage);
+                var difference = 100 - currentSum;
+                if (difference != 0)
+                {
+                    // مابه‌التفاوت به بزرگترین آیتم اضافه می‌شود تا خطا کمتر به چشم بیاید
+                    sortedItems.First().Percentage += difference;
+                }
+            }
             return new MarketSentimentData { Items = [.. items.OrderByDescending(i => i.Percentage)] };
         }
 
@@ -520,7 +541,7 @@ namespace IME.SpotDataApi.Services.Dashboard
                 });
             }
 
-            // --- برترین کارگزار (فروشنده) ---
+            // --- برترین کارگزار ---
             var topBrokerData = todayTrades
                 .GroupBy(t => t.SellerBrokerId)
                 .Select(g => new { BrokerId = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
@@ -605,7 +626,7 @@ namespace IME.SpotDataApi.Services.Dashboard
                     IconCssClass = icon,
                     IconBgCssClass = bgClass,
                     Value = FormatLargeNumber(h.TotalValue),
-                    Change = $"{h.AbsorptionRate:F0}% جذب",
+                    Change = $"نسبت فروش به عرضه: {h.AbsorptionRate:F0}%",
                     ChangeState = state
                 };
             })
@@ -707,5 +728,41 @@ namespace IME.SpotDataApi.Services.Dashboard
 
 
         #endregion MarketProgress
+
+        #region SpotNotifications
+        public async Task<SpotNotificationData> GetSpotNotificationsAsync()
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var todayNotifications = context.SpotNotifications
+                //.Where(n => n.NewsDateTime.Date == DateTime.Today)
+                .OrderByDescending(n => n.NewsDateTime)
+                .Take(5)
+                .ToList();
+
+            var items = todayNotifications.Select(n => new SpotNotificationItem
+            {
+                Title = n.MainTitle ?? string.Empty,
+                Source = n.URL ?? string.Empty,
+                Category = GetNotificationCategory(n.MainTitle)
+            }).ToList();
+
+            return new SpotNotificationData { Items = items };
+        }
+
+        private SpotNotificationCategory GetNotificationCategory(string? title)
+        {
+            if (string.IsNullOrEmpty(title))
+            {
+                return SpotNotificationCategory.Other;
+            }
+
+            if (title.Contains("اصلاحیه")) return SpotNotificationCategory.Amendment;
+            if (title.Contains("پذیرش کالا")) return SpotNotificationCategory.ProductAcceptance;
+            if (title.Contains("تمدید مجوز")) return SpotNotificationCategory.LicenseRenewal;
+            if (title.Contains("ابلاغیه")) return SpotNotificationCategory.Announcement;
+            
+            return SpotNotificationCategory.Other;
+        }
+        #endregion SpotNotifications
     }
 }
