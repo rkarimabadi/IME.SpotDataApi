@@ -1,0 +1,309 @@
+﻿using IME.SpotDataApi.Data;
+using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.Presentation;
+using IME.SpotDataApi.Models.Spot;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace IME.SpotDataApi.Services.Markets
+{
+    public interface IMarketsService
+    {
+        Task<List<MarketInfo>> GetMainGroupsDataAsync();
+        Task<CommodityStatusData> GetIndexGroupsAsync();
+        Task<List<MarketActivity>> GetMarketActivitiesAsync();
+
+    }
+
+    public class MarketsService : IMarketsService
+    {
+        private readonly IDbContextFactory<AppDataContext> _contextFactory;
+        private readonly IDateHelper _dateHelper;
+
+        public MarketsService(IDbContextFactory<AppDataContext> contextFactory, IDateHelper dateHelper)
+        {
+            _contextFactory = contextFactory;
+            _dateHelper = dateHelper;
+        }
+         
+        #region MainGroupsData
+        public async Task<List<MarketInfo>> GetMainGroupsDataAsync()
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            var todayTrades = await context.TradeReports
+                .Where(t => t.TradeDate == todayPersian)
+                .ToListAsync();
+            
+            var commodities = await context.Commodities.ToDictionaryAsync(c => c.Id);
+            var subGroups = await context.SubGroups.ToDictionaryAsync(s => s.Id);
+            var groups = await context.Groups.ToDictionaryAsync(g => g.Id);
+            var mainGroups = await context.MainGroups.ToListAsync();
+
+            // محاسبه داده‌های بازار فقط برای گروه‌هایی که امروز معامله داشته‌اند
+            var activeMarketData = todayTrades
+                .Select(trade => {
+                    var commodity = commodities.GetValueOrDefault(trade.CommodityId);
+                    var subGroup = commodity?.ParentId.HasValue == true ? subGroups.GetValueOrDefault(commodity.ParentId.Value) : null;
+                    var group = subGroup?.ParentId.HasValue == true ? groups.GetValueOrDefault(subGroup.ParentId.Value) : null;
+                    var mainGroup = group?.ParentId.HasValue == true ? mainGroups.FirstOrDefault(mg => mg.Id == group.ParentId.Value) : null;
+                    return new { Trade = trade, MainGroup = mainGroup, SubGroup = subGroup };
+                })
+                .Where(x => x.MainGroup != null)
+                .GroupBy(x => x.MainGroup)
+                .Select(g => {
+                    var mainGroup = g.Key;
+                    var tradesInGroup = g.Select(x => x.Trade).ToList();
+                    
+                    decimal totalTradeValue = tradesInGroup.Sum(t => t.TradeValue);
+                    decimal totalBaseValue = tradesInGroup.Sum(t => t.OfferBasePrice * t.TradeVolume / 1000);
+                    decimal marketHeat = totalBaseValue > 0 ? ((totalTradeValue - totalBaseValue) / totalBaseValue) * 100 : 0;
+
+                    var topSubGroups = g
+                        .Where(x => x.SubGroup != null)
+                        .GroupBy(x => x.SubGroup.PersianName)
+                        .OrderByDescending(sg => sg.Sum(t => t.Trade.TradeValue))
+                        .Take(3)
+                        .Select(sg => sg.Key)
+                        .ToList();
+
+                    return new {
+                        MainGroupId = mainGroup.Id,
+                        MarketHeat = marketHeat,
+                        Subtitles = topSubGroups
+                    };
+                })
+                .ToDictionary(d => d.MainGroupId);
+
+            // ایجاد لیست نهایی با تمام گروه‌های اصلی
+            return mainGroups.Select(mainGroup => {
+                string subtitle;
+                string heatLevel;
+                string heatLabel;
+
+                if (activeMarketData.TryGetValue(mainGroup.Id, out var data))
+                {
+                    // اگر گروه فعال بوده، از داده‌های محاسبه‌شده استفاده کن
+                    subtitle = string.Join("، ", data.Subtitles);
+                    (heatLevel, heatLabel) = GetHeatLevel(data.MarketHeat);
+                }
+                else
+                {
+                    // اگر گروه فعال نبوده، از مقادیر پیش‌فرض استفاده کن
+                    subtitle = GetDefaultSubtitle(mainGroup.PersianName);
+                    heatLevel = "neutral";
+                    heatLabel = "خنثی";
+                }
+
+                var (iconClass, iconContainerClass) = GetMainGroupVisuals(mainGroup.PersianName);
+                
+                return new MarketInfo(
+                    mainGroup.PersianName,
+                    subtitle,
+                    mainGroup.KeyName, // UrlName
+                    iconClass,
+                    iconContainerClass,
+                    heatLevel,
+                    heatLabel
+                );
+            }).ToList();
+        }
+
+        private (string HeatLevel, string HeatLabel) GetHeatLevel(decimal heat)
+        {
+            if (heat > 10) return ("high", "داغ");
+            if (heat > 3) return ("medium", "متوسط");
+            if (heat < -3) return ("low", "آرام"); // اصلاح برای در نظر گرفتن رقابت منفی
+            return ("neutral", "خنثی");
+        }
+
+        private string GetDefaultSubtitle(string mainGroupName)
+        {
+            return mainGroupName switch
+            {
+                "صنعتی و معدنی" => "فولاد، مس، آلومینیوم",
+                "فرآورده های نفتی و پتروشیمی" => "پلیمرها، مواد شیمیایی، قیر",
+                "کشاورزی" => "زعفران، پسته، جو",
+                _ => "کالاهای متنوع"
+            };
+        }
+
+        private (string IconClass, string IconContainerClass) GetMainGroupVisuals(string mainGroupName)
+        {
+            if (mainGroupName.Contains("صنعتی")) return ("bi-building", "industrial");
+            if (mainGroupName.Contains("پتروشیمی")) return ("bi-droplet-fill", "petro");
+            if (mainGroupName.Contains("کشاورزی")) return ("bi-tree-fill", "agri");
+            if (mainGroupName.Contains("نفتی")) return ("bi-fuel-pump-fill", "oil-products");
+            if (mainGroupName.Contains("معدنی")) return ("bi-gem", "mineral");
+            if (mainGroupName.Contains("اموال")) return ("bi-house-door-fill", "real-estate");
+            if (mainGroupName.Contains("فرعی")) return ("bi-shop", "secondary");
+            return ("bi-grid-fill", "other");
+        }
+
+        #endregion MainGroupsData
+
+        #region IndexGroups
+        public async Task<CommodityStatusData> GetIndexGroupsAsync()
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            var todayOffers = await context.Offers
+                .Where(o => o.OfferDate == todayPersian)
+                .ToListAsync();
+
+            if (!todayOffers.Any())
+            {
+                return new CommodityStatusData();
+            }
+
+            var commodities = await context.Commodities.ToDictionaryAsync(c => c.Id);
+            var subGroups = await context.SubGroups.ToDictionaryAsync(s => s.Id);
+            var groups = await context.Groups.ToDictionaryAsync(g => g.Id);
+            var mainGroups = await context.MainGroups.ToDictionaryAsync(m => m.Id);
+            
+            var todayTrades = await context.TradeReports
+                .Where(t => t.TradeDate == todayPersian)
+                .ToListAsync();
+
+            // ایجاد یک ساختار برای اتصال هر عرضه به گروه و گروه اصلی خود
+            var offersWithHierarchy = todayOffers
+                .Select(offer => {
+                    var commodity = commodities.GetValueOrDefault(offer.CommodityId);
+                    var subGroup = commodity?.ParentId.HasValue == true ? subGroups.GetValueOrDefault(commodity.ParentId.Value) : null;
+                    var group = subGroup?.ParentId.HasValue == true ? groups.GetValueOrDefault(subGroup.ParentId.Value) : null;
+                    var mainGroup = group?.ParentId.HasValue == true ? mainGroups.GetValueOrDefault(group.ParentId.Value) : null;
+                    return new { Offer = offer, Group = group, MainGroup = mainGroup };
+                })
+                .Where(x => x.Group != null && x.MainGroup != null)
+                .ToList();
+
+            // پیدا کردن ۵ گروه برتر بر اساس تعداد عرضه
+            var topGroups = offersWithHierarchy
+                .GroupBy(x => x.Group)
+                .Select(g => new { Group = g.Key, OfferCount = g.Count(), OfferIds = g.Select(x => x.Offer.Id).ToHashSet() })
+                .OrderByDescending(x => x.OfferCount)
+                .Take(5)
+                .ToList();
+
+            var items = new List<CommodityStatusItem>();
+
+            foreach (var topGroup in topGroups)
+            {
+                var mainGroup = mainGroups.GetValueOrDefault(topGroup.Group.ParentId ?? 0);
+
+                // محاسبه وضعیت تقاضا برای گروه
+                var tradesForGroup = todayTrades.Where(t => topGroup.OfferIds.Contains(t.OfferId)).ToList();
+                var totalDemand = tradesForGroup.Sum(t => t.DemandVolume);
+                var totalSupply = tradesForGroup.Sum(t => t.OfferVolume);
+                
+                items.Add(new CommodityStatusItem
+                {
+                    Name = topGroup.Group.PersianName,
+                    MainGroupName = mainGroup?.PersianName ?? "نامشخص",
+                    OfferCount = topGroup.OfferCount,
+                    DemandStatus = GetDemandStatus(totalDemand, totalSupply)
+                });
+            }
+
+            return new CommodityStatusData { Items = items };
+        }
+
+        private DemandStatus GetDemandStatus(decimal demand, decimal supply)
+        {
+            if (supply == 0) return DemandStatus.Medium;
+            var ratio = demand / supply;
+            if (ratio > 1.2m) return DemandStatus.High;
+            if (ratio < 0.8m) return DemandStatus.Low;
+            return DemandStatus.Medium;
+        }
+        #endregion IndexGroups
+
+        #region MarketActivities
+        public async Task<List<MarketActivity>> GetMarketActivitiesAsync()
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            var todayOffers = await context.Offers
+                .Where(o => o.OfferDate == todayPersian)
+                .ToListAsync();
+            
+            var todayTradedOfferIds = await context.TradeReports
+                .Where(t => t.TradeDate == todayPersian)
+                .Select(t => t.OfferId)
+                .Distinct()
+                .ToListAsync();
+
+            var todayTrades = await context.TradeReports
+                .Where(t => t.TradeDate == todayPersian)
+                .ToListAsync();
+
+            var commodities = await context.Commodities.ToDictionaryAsync(c => c.Id);
+            var subGroups = await context.SubGroups.ToDictionaryAsync(s => s.Id);
+            var groups = await context.Groups.ToDictionaryAsync(g => g.Id);
+            var mainGroups = await context.MainGroups.ToDictionaryAsync(m => m.Id);
+
+            var activities = todayOffers
+                .Select(offer => {
+                    var commodity = commodities.GetValueOrDefault(offer.CommodityId);
+                    var subGroup = commodity?.ParentId.HasValue == true ? subGroups.GetValueOrDefault(commodity.ParentId.Value) : null;
+                    var group = subGroup?.ParentId.HasValue == true ? groups.GetValueOrDefault(subGroup.ParentId.Value) : null;
+                    var mainGroup = group?.ParentId.HasValue == true ? mainGroups.GetValueOrDefault(group.ParentId.Value) : null;
+                    return new { Offer = offer, MainGroup = mainGroup };
+                })
+                .Where(x => x.MainGroup != null)
+                .GroupBy(x => x.MainGroup)
+                .Select(g => {
+                    var mainGroup = g.Key;
+                    var offersInGroup = g.Select(x => x.Offer).ToList();
+                    var tradedOffersCount = offersInGroup.Count(o => todayTradedOfferIds.Contains(o.Id));
+                    var totalOffersCount = offersInGroup.Count;
+                    
+                    var offerIdsInGroup = offersInGroup.Select(o => o.Id).ToHashSet();
+                    var totalValue = todayTrades
+                        .Where(t => offerIdsInGroup.Contains(t.OfferId))
+                        .Sum(t => t.TradeValue * 1000);
+
+                    return new {
+                        MainGroup = mainGroup,
+                        TotalOffers = totalOffersCount,
+                        TradedOffers = tradedOffersCount,
+                        TotalValue = totalValue
+                    };
+                })
+                .OrderByDescending(x => x.TotalOffers)
+                .Take(3)
+                .Select(x => {
+                    var percentage = x.TotalOffers > 0 ? (double)x.TradedOffers / x.TotalOffers : 0;
+                    return new MarketActivity(
+                        x.MainGroup.PersianName,
+                        GetMainGroupVisuals(x.MainGroup.PersianName).IconContainerClass,
+                        percentage,
+                        $"{percentage:P0} انجام شده",
+                        FormatLargeNumber(x.TotalValue)
+                    );
+                })
+                .ToList();
+
+            // اگر کمتر از ۳ گروه فعال بود، لیست را با آیتم‌های خالی پر کن
+            while (activities.Count < 3)
+            {
+                activities.Add(new MarketActivity("نامشخص", "disabled", 0, "بدون عرضه", "۰"));
+            }
+
+            return activities;
+        }
+        private string FormatLargeNumber(decimal valueInRials)
+        {
+            if (valueInRials == 0) return "۰";
+            var hemtValue = valueInRials / 10_000_000_000_000M;
+            return $"{hemtValue:F1} همت";
+        }
+        #endregion MarketActivities
+    }
+}

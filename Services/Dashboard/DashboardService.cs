@@ -758,6 +758,7 @@ namespace IME.SpotDataApi.Services.Dashboard
 
             if (title.Contains("اصلاحیه")) return SpotNotificationCategory.Amendment;
             if (title.Contains("پذیرش کالا")) return SpotNotificationCategory.ProductAcceptance;
+            if (title.Contains("پذیرش خودرو")) return SpotNotificationCategory.CarAcceptance;
             if (title.Contains("تمدید مجوز")) return SpotNotificationCategory.LicenseRenewal;
             if (title.Contains("ابلاغیه")) return SpotNotificationCategory.Announcement;
             
