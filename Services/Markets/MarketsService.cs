@@ -15,7 +15,7 @@ namespace IME.SpotDataApi.Services.Markets
         Task<List<MarketInfo>> GetMainGroupsDataAsync();
         Task<CommodityStatusData> GetIndexGroupsAsync();
         Task<List<MarketActivity>> GetMarketActivitiesAsync();
-
+        Task<MarketHeatmapData> GetMarketHeatmapDataAsync();
     }
 
     public class MarketsService : IMarketsService
@@ -305,5 +305,103 @@ namespace IME.SpotDataApi.Services.Markets
             return $"{hemtValue:F1} همت";
         }
         #endregion MarketActivities
+
+        #region MarketHeatmap
+        public async Task<MarketHeatmapData> GetMarketHeatmapDataAsync()
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            var mainGroups = await context.MainGroups.ToListAsync();
+            var todayTrades = await context.TradeReports.Where(t => t.TradeDate == todayPersian).ToListAsync();
+            var todayOffers = await context.Offers.Where(o => o.OfferDate == todayPersian).ToListAsync();
+
+            // محاسبه شاخص‌های حرارت برای گروه‌های فعال
+            var activeGroupMetrics = mainGroups
+                .Select(mg => {
+                    var hierarchy = GetHierarchyForMainGroup(context, mg.Id);
+                    var offerIdsInGroup = todayOffers
+                        .Where(o => hierarchy.CommodityIds.Contains(o.CommodityId))
+                        .Select(o => o.Id)
+                        .ToHashSet();
+                    
+                    var tradesInGroup = todayTrades.Where(t => offerIdsInGroup.Contains(t.OfferId)).ToList();
+                    
+                    decimal heat = 0;
+                    if (tradesInGroup.Any())
+                    {
+                    decimal totalFinalValue = tradesInGroup.Sum(t => t.FinalWeightedAveragePrice * t.TradeVolume);
+                    decimal totalBaseValue = tradesInGroup.Sum(t => t.OfferBasePrice * t.TradeVolume);
+                    heat = totalBaseValue > 0 ? ((totalFinalValue - totalBaseValue) / totalBaseValue) * 100 : 0;
+                    }
+                    return new { MainGroup = mg, Heat = heat, Trades = tradesInGroup, Offers = todayOffers.Where(o => offerIdsInGroup.Contains(o.Id)).ToList() };
+                })
+                .OrderByDescending(x => x.Heat)
+                .ToList();
+
+            var heatmapItems = new List<MarketHeatmapItem>();
+            var rankedGroups = new HashSet<int>();
+
+            // تخصیص جایگاه‌های High
+            var highRankers = activeGroupMetrics.Take(2).ToList();
+            if (highRankers.Count > 0)
+            {
+                var topHigh = highRankers[0];
+                heatmapItems.Add(new MarketHeatmapItem { Title = topHigh.MainGroup.PersianName, Rank = MarketHeatRank.High, Subtitle = "بیشترین ارزش معاملات", Value = $"+{topHigh.Heat:F1}%" });
+                rankedGroups.Add(topHigh.MainGroup.Id);
+            }
+            if (highRankers.Count > 1)
+            {
+                var secondHigh = highRankers[1];
+                var demandRatio = secondHigh.Offers.Sum(o => o.OfferVol) > 0 ? secondHigh.Trades.Sum(t => t.DemandVolume) / secondHigh.Offers.Sum(o => o.OfferVol) : 0;
+                heatmapItems.Add(new MarketHeatmapItem { Title = secondHigh.MainGroup.PersianName, Rank = MarketHeatRank.High, Value = $"{demandRatio:F1}x" });
+                rankedGroups.Add(secondHigh.MainGroup.Id);
+            }
+
+            // تخصیص جایگاه‌های Medium
+            var mediumRankers = activeGroupMetrics.Skip(2).Take(2).ToList();
+            if (mediumRankers.Count > 0)
+            {
+                var topMedium = mediumRankers[0];
+                var realizationRatio = topMedium.Offers.Sum(o => o.InitPrice * o.OfferVol) > 0 ? topMedium.Trades.Sum(t => t.TradeValue * 1000) / topMedium.Offers.Sum(o => o.InitPrice * o.OfferVol * 1000) * 100 : 0;
+                heatmapItems.Add(new MarketHeatmapItem { Title = topMedium.MainGroup.PersianName, Rank = MarketHeatRank.Medium, Subtitle = "نرخ تحقق", Value = $"{realizationRatio:F0}%" });
+                rankedGroups.Add(topMedium.MainGroup.Id);
+            }
+            if (mediumRankers.Count > 1)
+            {
+                var secondMedium = mediumRankers[1];
+                heatmapItems.Add(new MarketHeatmapItem { Title = secondMedium.MainGroup.PersianName, Rank = MarketHeatRank.Medium });
+                rankedGroups.Add(secondMedium.MainGroup.Id);
+            }
+
+            // پر کردن بقیه لیست با گروه‌های باقی‌مانده
+            var remainingGroups = mainGroups.Where(mg => !rankedGroups.Contains(mg.Id)).ToList();
+            
+            var lowRankers = remainingGroups.Take(2).ToList();
+            foreach(var group in lowRankers)
+            {
+                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Rank = MarketHeatRank.Low });
+                rankedGroups.Add(group.Id);
+            }
+
+            var neutralRankers = mainGroups.Where(mg => !rankedGroups.Contains(mg.Id)).ToList();
+            foreach(var group in neutralRankers)
+            {
+                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Rank = MarketHeatRank.Neutral });
+            }
+
+            return new MarketHeatmapData { Items = heatmapItems };
+        }
+
+        private (HashSet<int> GroupIds, HashSet<int> SubGroupIds, HashSet<int> CommodityIds) GetHierarchyForMainGroup(AppDataContext context, int mainGroupId)
+        {
+            var groupIds = context.Groups.Where(g => g.ParentId == mainGroupId).Select(g => g.Id).ToHashSet();
+            var subGroupIds = context.SubGroups.Where(sg => sg.ParentId.HasValue && groupIds.Contains(sg.ParentId.Value)).Select(sg => sg.Id).ToHashSet();
+            var commodityIds = context.Commodities.Where(c => c.ParentId.HasValue && subGroupIds.Contains(c.ParentId.Value)).Select(c => c.Id).ToHashSet();
+            return (groupIds, subGroupIds, commodityIds);
+        }
+        #endregion MarketHeatmap
+
+     
     }
 }
