@@ -46,22 +46,17 @@ namespace IME.SpotDataApi.Controllers
             return Ok(data);
         }
         [HttpGet("market-shortcuts")]
-        [ProducesResponseType(typeof(MarketHeatmapData), 200)]
+        [ProducesResponseType(typeof(MarketShortcutsData), 200)]
         public async Task<IActionResult> GetMarketShortcuts()
         {
-            var data = new MarketShortcutsData
-            {
-                Items = new List<MarketShortcutItem>
-                {
-                    new() { Title = "اموال غیر منقول", IconCssClass = "bi bi-house-door-fill", ThemeCssClass = "real-estate" },
-                    new() { Title = "بازار فرعی", IconCssClass = "bi bi-shop", ThemeCssClass = "secondary" },
-                    new() { Title = "صنعتی", IconCssClass = "bi bi-building", ThemeCssClass = "industrial" },
-                    new() { Title = "فرآورده های نفتی", IconCssClass = "bi bi-fuel-pump-fill", ThemeCssClass = "oil-products" },
-                    new() { Title = "معدنی", IconCssClass = "bi bi-gem", ThemeCssClass = "mineral" },
-                    new() { Title = "پتروشیمی", IconCssClass = "bi bi-droplet-fill", ThemeCssClass = "petro" },
-                    new() { Title = "کشاورزی", IconCssClass = "bi bi-tree-fill", ThemeCssClass = "agri" }
-                }
-            };
+            var data = await _marketsService.GetMarketShortcutsAsync();
+            return Ok(data);
+        }
+        [HttpGet("market-list")]
+        [ProducesResponseType(typeof(ItemInfo), 200)]
+        public async Task<IActionResult> GetMarketList()
+        {
+            var data = await _marketsService.GetMarketListAsync();
             return Ok(data);
         }
     }

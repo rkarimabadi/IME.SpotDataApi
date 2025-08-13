@@ -26,5 +26,27 @@ namespace IME.SpotDataApi.Helpers
         {
             return (pc.GetYear(date), pc.GetMonth(date), pc.GetDayOfMonth(date));
         }
+
+                /// <summary>
+        /// یک رشته تاریخ شمسی با فرمت yyyy/MM/dd را به DateTime میلادی تبدیل می‌کند.
+        /// </summary>
+        public DateTime GetGregorian(string persianDate)
+        {
+            try
+            {
+                var parts = persianDate.Split('/');
+                if (parts.Length != 3) return DateTime.MinValue;
+
+                int year = int.Parse(parts[0]);
+                int month = int.Parse(parts[1]);
+                int day = int.Parse(parts[2]);
+
+                return pc.ToDateTime(year, month, day, 0, 0, 0, 0);
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
     }
 }

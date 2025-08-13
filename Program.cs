@@ -8,6 +8,7 @@ using IME.SpotDataApi.Repository;
 using IME.SpotDataApi.Services.Authenticate;
 using IME.SpotDataApi.Services.Dashboard;
 using IME.SpotDataApi.Services.Data;
+using IME.SpotDataApi.Services.MainGroupLevel;
 using IME.SpotDataApi.Services.Markets;
 using IME.SpotDataApi.Services.RemoteData;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddHostedService<DataSyncService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IMarketsService, MarketsService>();
+builder.Services.AddScoped<IMainGroupService, MainGroupService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

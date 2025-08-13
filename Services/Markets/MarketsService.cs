@@ -16,6 +16,8 @@ namespace IME.SpotDataApi.Services.Markets
         Task<CommodityStatusData> GetIndexGroupsAsync();
         Task<List<MarketActivity>> GetMarketActivitiesAsync();
         Task<MarketHeatmapData> GetMarketHeatmapDataAsync();
+        Task<MarketShortcutsData> GetMarketShortcutsAsync();
+        Task<List<ItemInfo>> GetMarketListAsync();
     }
 
     public class MarketsService : IMarketsService
@@ -103,6 +105,7 @@ namespace IME.SpotDataApi.Services.Markets
                 
                 return new MarketInfo(
                     mainGroup.PersianName,
+                    mainGroup.Id,
                     subtitle,
                     mainGroup.KeyName, // UrlName
                     iconClass,
@@ -125,9 +128,12 @@ namespace IME.SpotDataApi.Services.Markets
         {
             return mainGroupName switch
             {
-                "صنعتی و معدنی" => "فولاد، مس، آلومینیوم",
-                "فرآورده های نفتی و پتروشیمی" => "پلیمرها، مواد شیمیایی، قیر",
+                "صنعتی" => "فولاد، مس، آلومینیوم",
+                "پتروشیمی و فرآورده های نفتی" => "پلیمرها، مواد شیمیایی، قیر",
                 "کشاورزی" => "زعفران، پسته، جو",
+                "اموال غیر منقول" => "ساختمان، زمین، مستغلات",
+                "معدنی" => "سنگ آهن، زغال سنگ",
+                "فرآورده های نفتی" => "قیر، روغن، گاز",
                 _ => "کالاهای متنوع"
             };
         }
@@ -347,14 +353,14 @@ namespace IME.SpotDataApi.Services.Markets
             if (highRankers.Count > 0)
             {
                 var topHigh = highRankers[0];
-                heatmapItems.Add(new MarketHeatmapItem { Title = topHigh.MainGroup.PersianName, Rank = MarketHeatRank.High, Subtitle = "بیشترین ارزش معاملات", Value = $"+{topHigh.Heat:F1}%" });
+                heatmapItems.Add(new MarketHeatmapItem { Title = topHigh.MainGroup.PersianName, Code = topHigh.MainGroup.Id, Rank = MarketHeatRank.High, Subtitle = "بیشترین ارزش معاملات", Value = $"+{topHigh.Heat:F1}%" });
                 rankedGroups.Add(topHigh.MainGroup.Id);
             }
             if (highRankers.Count > 1)
             {
                 var secondHigh = highRankers[1];
                 var demandRatio = secondHigh.Offers.Sum(o => o.OfferVol) > 0 ? secondHigh.Trades.Sum(t => t.DemandVolume) / secondHigh.Offers.Sum(o => o.OfferVol) : 0;
-                heatmapItems.Add(new MarketHeatmapItem { Title = secondHigh.MainGroup.PersianName, Rank = MarketHeatRank.High, Value = $"{demandRatio:F1}x" });
+                heatmapItems.Add(new MarketHeatmapItem { Title = secondHigh.MainGroup.PersianName, Code = secondHigh.MainGroup.Id, Rank = MarketHeatRank.High, Value = $"{demandRatio:F1}x" });
                 rankedGroups.Add(secondHigh.MainGroup.Id);
             }
 
@@ -364,13 +370,13 @@ namespace IME.SpotDataApi.Services.Markets
             {
                 var topMedium = mediumRankers[0];
                 var realizationRatio = topMedium.Offers.Sum(o => o.InitPrice * o.OfferVol) > 0 ? topMedium.Trades.Sum(t => t.TradeValue * 1000) / topMedium.Offers.Sum(o => o.InitPrice * o.OfferVol * 1000) * 100 : 0;
-                heatmapItems.Add(new MarketHeatmapItem { Title = topMedium.MainGroup.PersianName, Rank = MarketHeatRank.Medium, Subtitle = "نرخ تحقق", Value = $"{realizationRatio:F0}%" });
+                heatmapItems.Add(new MarketHeatmapItem { Title = topMedium.MainGroup.PersianName, Code = topMedium.MainGroup.Id, Rank = MarketHeatRank.Medium, Subtitle = "نرخ تحقق", Value = $"{realizationRatio:F0}%" });
                 rankedGroups.Add(topMedium.MainGroup.Id);
             }
             if (mediumRankers.Count > 1)
             {
                 var secondMedium = mediumRankers[1];
-                heatmapItems.Add(new MarketHeatmapItem { Title = secondMedium.MainGroup.PersianName, Rank = MarketHeatRank.Medium });
+                heatmapItems.Add(new MarketHeatmapItem { Title = secondMedium.MainGroup.PersianName, Code = secondMedium.MainGroup.Id, Rank = MarketHeatRank.Medium });
                 rankedGroups.Add(secondMedium.MainGroup.Id);
             }
 
@@ -380,14 +386,14 @@ namespace IME.SpotDataApi.Services.Markets
             var lowRankers = remainingGroups.Take(2).ToList();
             foreach(var group in lowRankers)
             {
-                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Rank = MarketHeatRank.Low });
+                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Code = group.Id, Rank = MarketHeatRank.Low });
                 rankedGroups.Add(group.Id);
             }
 
             var neutralRankers = mainGroups.Where(mg => !rankedGroups.Contains(mg.Id)).ToList();
             foreach(var group in neutralRankers)
             {
-                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Rank = MarketHeatRank.Neutral });
+                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Code = group.Id, Rank = MarketHeatRank.Neutral });
             }
 
             return new MarketHeatmapData { Items = heatmapItems };
@@ -402,6 +408,32 @@ namespace IME.SpotDataApi.Services.Markets
         }
         #endregion MarketHeatmap
 
-     
+        #region marketlist
+        public Task<List<ItemInfo>> GetMarketListAsync()
+        {
+            using var context = _contextFactory.CreateDbContext();
+            return context.MainGroups.Select(x => new ItemInfo(x.Id, x.PersianName)).ToListAsync();
+        }
+        #endregion marketlist
+
+        #region MarketShortcuts
+        public Task<MarketShortcutsData> GetMarketShortcutsAsync()
+        {
+            var data = new MarketShortcutsData
+            {
+                Items = new List<MarketShortcutItem>
+                {
+                    new() { Title = "اموال غیر منقول", Code = 6, IconCssClass = "bi bi-house-door-fill", ThemeCssClass = "real-estate" },
+                    new() { Title = "بازار فرعی", Code = 7, IconCssClass = "bi bi-shop", ThemeCssClass = "secondary" },
+                    new() { Title = "صنعتی", Code = 1, IconCssClass = "bi bi-building", ThemeCssClass = "industrial" },
+                    new() { Title = "فرآورده های نفتی", Code = 5, IconCssClass = "bi bi-fuel-pump-fill", ThemeCssClass = "oil-products" },
+                    new() { Title = "معدنی", Code = 4, IconCssClass = "bi bi-gem", ThemeCssClass = "mineral" },
+                    new() { Title = "پتروشیمی", Code = 3, IconCssClass = "bi bi-droplet-fill", ThemeCssClass = "petro" },
+                    new() { Title = "کشاورزی", Code = 2, IconCssClass = "bi bi-tree-fill", ThemeCssClass = "agri" }
+                }
+            };
+            return Task.FromResult(data);
+        }
+        #endregion MarketShortcuts
     }
 }
