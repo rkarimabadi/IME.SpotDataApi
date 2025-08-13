@@ -50,7 +50,7 @@ namespace IME.SpotDataApi.Services.Data
                     await SyncBasicInformation<Tender>($"/{version}/spot/Tenders", stoppingToken);
 
 
-                    await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-19), DateTime.Now, stoppingToken);
+                    await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-5), DateTime.Now.AddDays(15), stoppingToken);
                     await SyncOperationalResource<TradeReport>($"/{version}/spot/reports/Trades", DateTime.Now.AddDays(-5), DateTime.Now, stoppingToken);
                     await SyncOperationalResource<NewsNotification>("api/Notifications/NewsNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
                     await SyncOperationalResource<SpotNotification>("/api/Notifications/SpotNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
