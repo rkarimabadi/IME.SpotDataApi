@@ -369,3 +369,4 @@ FodyWeavers.xsd
 /App_Data/local_data.db-wal
 *.dll
 *.xml
+/appsettings.json
