@@ -32,7 +32,6 @@ namespace IME.SpotDataApi.Services.RemoteData
         {
             return await RetrieveDataFromRemoteApiAsync(date);
         }
-
         public async Task<IEnumerable<T>> RetrieveAsync(DateTime fromDate, DateTime toDate)
         {
             if (fromDate > toDate) return Enumerable.Empty<T>();
@@ -54,8 +53,12 @@ namespace IME.SpotDataApi.Services.RemoteData
             return allResults;
         }
 
+        private static readonly Random _random = new Random();
         private async Task<IEnumerable<T>> RetrieveDataFromRemoteApiAsync(DateTime date)
         {
+            var stoppingToken  = new CancellationToken();
+            int delayInSeconds = _random.Next(5, 10);
+            await Task.Delay(TimeSpan.FromSeconds(delayInSeconds), stoppingToken);
             var persianDate = _dateHelper.GetPersianYYYYMMDD(date);
             var requestUrl = $"{EndPointPath}?persianDate={persianDate}&pageNumber=1&pageSize=1000&Language=fa";
             var items = new List<T>();

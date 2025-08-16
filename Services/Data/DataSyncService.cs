@@ -50,7 +50,7 @@ namespace IME.SpotDataApi.Services.Data
                     await SyncBasicInformation<Tender>($"/{version}/spot/Tenders", stoppingToken);
 
 
-                    await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-5), DateTime.Now.AddDays(15), stoppingToken);
+                    await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-7), DateTime.Now.AddDays(25), stoppingToken);
                     await SyncOperationalResource<TradeReport>($"/{version}/spot/reports/Trades", DateTime.Now.AddDays(-5), DateTime.Now, stoppingToken);
                     await SyncOperationalResource<NewsNotification>("api/Notifications/NewsNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
                     await SyncOperationalResource<SpotNotification>("/api/Notifications/SpotNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
@@ -102,6 +102,7 @@ namespace IME.SpotDataApi.Services.Data
             if (stoppingToken.IsCancellationRequested) return;
 
             _logger.LogInformation("شروع همگام‌سازی موازی برای: {EntityName}", typeof(T).Name);
+
             try
             {
                 using var scope = _serviceProvider.CreateScope();
