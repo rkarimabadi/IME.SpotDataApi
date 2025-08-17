@@ -8,8 +8,10 @@ using IME.SpotDataApi.Repository;
 using IME.SpotDataApi.Services.Authenticate;
 using IME.SpotDataApi.Services.Dashboard;
 using IME.SpotDataApi.Services.Data;
+using IME.SpotDataApi.Services.GroupLevel;
 using IME.SpotDataApi.Services.MainGroupLevel;
 using IME.SpotDataApi.Services.Markets;
+using IME.SpotDataApi.Services.OfferDetails;
 using IME.SpotDataApi.Services.RemoteData;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,6 +41,7 @@ builder.Services.AddScoped<IMarketsService, MarketsService>();
 builder.Services.AddScoped<IMainGroupService, MainGroupService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<ISubGroupService, SubGroupService>();
+builder.Services.AddScoped<IOfferDetailsService, OfferDetailsService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

@@ -1,5 +1,6 @@
 ﻿using IME.SpotDataApi.Resources;
 using System.Collections;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace IME.SpotDataApi.Helpers
@@ -33,13 +34,31 @@ namespace IME.SpotDataApi.Helpers
                 // Return an empty string
                 return "info-circle";
             }
-            // Check if the input is shorter than 25 characters
-            if (RingIcons.ResourceManager.GetString(input) != null)
+            try
             {
-                // Return the input as it is
-                return RingIcons.ResourceManager.GetString(input);
+                // Check if the input is shorter than 25 characters
+                if (RingIcons.ResourceManager.GetString(input) != null)
+                {
+                    // Return the input as it is
+                    return RingIcons.ResourceManager.GetString(input);
+                }
+                return "info-circle";
+            } catch
+            {
+                return input switch
+                {
+                    "تالار پتروشیمی" => "petrochemical",
+                    "تالار حراج باز" => "open-auction",
+                    "تالار خودرو" => "car",
+                    "تالار سیمان" => "cement",
+                    "تالار صنعتی" => "industrial",
+                    "تالار فرآورده های نفتی" => "petroleum",
+                    "تالار فرعی" => "substitute",
+                    "تالار کالای صادراتی کيش" => "export-goods",
+                    "تالار کشاورزی" => "agriculture",
+                    _ => "info-circle"
+                };
             }
-            return "info-circle";
         }
 
         public static string AddSlashToYYYYMMDDFormat(this string input)

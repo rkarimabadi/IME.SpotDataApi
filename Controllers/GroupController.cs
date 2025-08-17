@@ -1,5 +1,5 @@
 ﻿using IME.SpotDataApi.Models.Presentation;
-using IME.SpotDataApi.Services.MainGroupLevel;
+using IME.SpotDataApi.Services.GroupLevel;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
@@ -36,6 +36,13 @@ namespace IME.SpotDataApi.Controllers
         public async Task<IActionResult> GetUpcomingOffers(int groupId)
         {
             var data = await _groupService.GetUpcomingOffersAsync(groupId);
+            return Ok(data);
+        }
+        [HttpGet("{groupId}/today-offers")]
+        [ProducesResponseType(typeof(UpcomingOffersData), 200)]
+        public async Task<IActionResult> GetTodayOffers(int groupId)
+        {
+            var data = await _groupService.GetTodayOffersAsync(groupId);
             return Ok(data);
         }
     }

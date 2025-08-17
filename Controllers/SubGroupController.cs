@@ -39,5 +39,12 @@ namespace IME.SpotDataApi.Controllers
             var data = await _subGroupService.GetUpcomingOffersAsync(subGroupId);
             return Ok(data);
         }
+        [HttpGet("{subGroupId}/today-offers")]
+        [ProducesResponseType(typeof(UpcomingOffersData), 200)]
+        public async Task<IActionResult> GetTodayOffers(int subGroupId)
+        {
+            var data = await _subGroupService.GetTodayOffersAsync(subGroupId);
+            return Ok(data);
+        }
     }
 }

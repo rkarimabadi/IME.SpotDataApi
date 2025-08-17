@@ -6,13 +6,10 @@ using System.Globalization;
 
 namespace IME.SpotDataApi.Services.MainGroupLevel
 {
-    public interface ISubGroupService
-    {
-        Task<GroupListData> GetActiveCommoditiesAsync(int subGroupId);
-        Task<MarketConditionsData> GetCommodityActivitiesAsync(int subGroupId);
-        Task<UpcomingOffersData> GetUpcomingOffersAsync(int subGgroupId);
-    }
-
+    /// <summary>
+    /// این نسخه از سرویس برای افزایش پرفورمنس ریفکتور شده است.
+    /// تغییرات اصلی شامل بهینه‌سازی کوئری‌های دیتابیس برای کاهش بار و افزایش سرعت است.
+    /// </summary>
     public class SubGroupService : ISubGroupService
     {
         private readonly IDbContextFactory<AppDataContext> _contextFactory;
@@ -27,56 +24,78 @@ namespace IME.SpotDataApi.Services.MainGroupLevel
         #region ActiveCommodities
         public async Task<GroupListData> GetActiveCommoditiesAsync(int subGroupId)
         {
-            using var context = _contextFactory.CreateDbContext();
+            using var context = await _contextFactory.CreateDbContextAsync();
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            var allOffers = await context.Offers.ToListAsync();
-            var suppliers = await context.Suppliers.ToDictionaryAsync(c => c.Id);
+            // راه حل پایدار: برای جلوگیری از خطای ترجمه کوئری، ابتدا یک لیست مسطح
+            // از کالاها و عرضه‌های مرتبط با آن‌ها را با یک LEFT JOIN ساده واکشی می‌کنیم.
+            var flatQuery = from commodity in context.Commodities.Where(c => c.ParentId == subGroupId)
+                            join offerInfo in (
+                                context.Offers.Join(
+                                    context.Suppliers,
+                                    o => o.SupplierId,
+                                    s => s.Id,
+                                    (o, s) => new { Offer = o, SupplierName = s.PersianName }
+                                )
+                            ) on commodity.Id equals offerInfo.Offer.CommodityId into grouping
+                            from offerInfo in grouping.DefaultIfEmpty() // این دستور LEFT JOIN را ایجاد می‌کند
+                            select new
+                            {
+                                CommodityId = commodity.Id,
+                                CommodityName = commodity.PersianName,
+                                OfferDate = offerInfo != null ? offerInfo.Offer.OfferDate : null,
+                                SupplierName = offerInfo != null ? offerInfo.SupplierName : null
+                            };
 
-            var commoditiesInSubGroup = await context.Commodities
-                .Where(g => g.ParentId == subGroupId)
-                .ToListAsync();
+            var flatData = await flatQuery.ToListAsync();
+
+            // سپس عملیات گروه‌بندی را در حافظه انجام می‌دهیم که سریع و قابل اطمینان است.
+            var commoditiesData = flatData
+                .GroupBy(x => new { x.CommodityId, x.CommodityName })
+                .Select(g =>
+                {
+                    // ردیف‌های نال ناشی از LEFT JOIN برای کالاهایی که عرضه نداشته‌اند را فیلتر می‌کنیم
+                    var validOffers = g.Where(x => x.OfferDate != null).ToList();
+
+                    return new
+                    {
+                        CommodityId = g.Key.CommodityId,
+                        CommodityName = g.Key.CommodityName,
+                        TodayOffersCount = validOffers.Count(o => o.OfferDate == todayPersian),
+                        FutureOffersCount = validOffers.Count(o => string.Compare(o.OfferDate, todayPersian) > 0),
+                        TopSuppliers = validOffers.Select(o => o.SupplierName).Distinct().Take(3)
+                    };
+                })
+                .ToList();
 
             var result = new GroupListData();
-
-            foreach (var commodity in commoditiesInSubGroup)
+            foreach (var commodity in commoditiesData)
             {
-
-                var offersInGroup = allOffers.Where(o => o.CommodityId == commodity.Id).ToList();
-
-                var todayOffers = offersInGroup.Where(o => o.OfferDate == todayPersian).ToList();
-                var futureOffers = offersInGroup.Where(o => string.Compare(o.OfferDate, todayPersian) > 0).ToList();
-
                 GroupActivityStatus status;
                 int? offerCount = null;
 
-                if (todayOffers.Any())
+                if (commodity.TodayOffersCount > 0)
                 {
                     status = GroupActivityStatus.ActiveToday;
-                    offerCount = todayOffers.Count;
+                    offerCount = commodity.TodayOffersCount;
                 }
-                else if (futureOffers.Any())
+                else if (commodity.FutureOffersCount > 0)
                 {
                     status = GroupActivityStatus.ActiveFuture;
-                    offerCount = futureOffers.Count;
+                    offerCount = commodity.FutureOffersCount;
                 }
                 else
                 {
                     status = GroupActivityStatus.Inactive;
                 }
 
-                var topSuppliers = suppliers.Values
-                    .Where(sg => allOffers.Any(o => o.CommodityId == commodity.Id && o.SupplierId == sg.Id))
-                    .Take(3)
-                    .Select(sg => sg.PersianName);
-
                 result.Items.Add(new GroupListItem
                 {
-                    Title = commodity.PersianName,
-                    UrlName = commodity.Id.ToString(),
+                    Title = commodity.CommodityName,
+                    UrlName = commodity.CommodityId.ToString(),
                     Status = status,
                     OfferCount = offerCount,
-                    Subtitle = string.Join("، ", topSuppliers)
+                    Subtitle = string.Join("، ", commodity.TopSuppliers)
                 });
             }
 
@@ -87,90 +106,158 @@ namespace IME.SpotDataApi.Services.MainGroupLevel
         #region CommodityActivities
         public async Task<MarketConditionsData> GetCommodityActivitiesAsync(int subGroupId)
         {
-            using var context = _contextFactory.CreateDbContext();
+            using var context = await _contextFactory.CreateDbContextAsync();
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            // پیدا کردن تمام کالاها و عرضه‌های مربوط به این گروه اصلی
-            var hierarchy = GetHierarchyForSubGroup(context, subGroupId);
-            var offersInCommodity = await context.Offers
-                .Where(o => o.OfferDate == todayPersian && hierarchy.Contains(o.CommodityId))
-                .ToListAsync();
-            var offerIdsInCommodity = offersInCommodity.Select(o => o.Id).ToHashSet();
-            var tradesInCommodity = await context.TradeReports
-                .Where(t => t.TradeDate == todayPersian && offerIdsInCommodity.Contains(t.OfferId))
+            // بازنویسی با الگوی پایدار: ابتدا داده‌های مورد نیاز را با Join واکشی می‌کنیم.
+            var tradesData = await context.TradeReports
+                .Where(t => t.TradeDate == todayPersian)
+                .Join(context.Offers,
+                    trade => trade.OfferId,
+                    offer => offer.Id,
+                    (trade, offer) => new { trade, offer })
+                .Join(context.Commodities,
+                    joined => joined.offer.CommodityId,
+                    commodity => commodity.Id,
+                    (joined, commodity) => new { joined.trade, commodity }) // فقط فیلدهای لازم را نگه می‌داریم
+                .Where(x => x.commodity.ParentId == subGroupId)
+                .Select(x => new {
+                    x.trade.TradeValue,
+                    x.trade.TradeVolume,
+                    x.trade.FinalWeightedAveragePrice,
+                    x.trade.OfferBasePrice,
+                    x.trade.DemandVolume,
+                    x.trade.OfferVolume
+                })
                 .ToListAsync();
 
             var items = new List<MarketConditionItem>();
+            if (tradesData.Any())
+            {
+                // سپس محاسبات تجمعی را در حافظه انجام می‌دهیم.
+                var stats = new
+                {
+                    TotalValue = tradesData.Sum(x => x.TradeValue * 1000),
+                    TotalVolume = tradesData.Sum(x => x.TradeVolume),
+                    TotalFinalValue = tradesData.Sum(x => x.FinalWeightedAveragePrice * x.TradeVolume),
+                    TotalBaseValue = tradesData.Sum(x => x.OfferBasePrice * x.TradeVolume),
+                    TotalDemand = tradesData.Sum(x => x.DemandVolume),
+                    TotalSupply = tradesData.Sum(x => x.OfferVolume)
+                };
 
-            // 1. ارزش معاملات
-            decimal totalValue = tradesInCommodity.Sum(t => t.TradeValue * 1000);
-            items.Add(new MarketConditionItem { Title = "ارزش معاملات", Value = (totalValue / 10_000_000_000_000M).ToString("F1"), Unit = "همت", IconCssClass = "bi bi-cash-stack", IconBgCssClass = "value" });
-
-            // 2. حجم معاملات
-            decimal totalVolume = tradesInCommodity.Sum(t => t.TradeVolume);
-            items.Add(new MarketConditionItem { Title = "حجم معاملات", Value = (totalVolume).ToString("F1"), Unit = "تن", IconCssClass = "bi bi-truck", IconBgCssClass = "volume" });
-
-            // 3. شاخص رقابت
-            decimal totalFinalValue = tradesInCommodity.Sum(t => t.FinalWeightedAveragePrice * t.TradeVolume);
-            decimal totalBaseValue = tradesInCommodity.Sum(t => t.OfferBasePrice * t.TradeVolume);
-            decimal competitionIndex = totalBaseValue > 0 ? ((totalFinalValue - totalBaseValue) / totalBaseValue) * 100 : 0;
-            items.Add(new MarketConditionItem { Title = "شاخص رقابت", Value = $"{competitionIndex:+#.##;-#.##;0.0}%", IconCssClass = "bi bi-fire", IconBgCssClass = "competition", ValueState = competitionIndex > 0 ? ValueState.Positive : (competitionIndex < 0 ? ValueState.Negative : ValueState.Neutral) });
-
-            // 4. قدرت تقاضا
-            decimal totalDemand = tradesInCommodity.Sum(t => t.DemandVolume);
-            decimal totalSupply = tradesInCommodity.Sum(t => t.OfferVolume);
-            decimal demandRatio = totalSupply > 0 ? totalDemand / totalSupply : 0;
-            items.Add(new MarketConditionItem { Title = "قدرت تقاضا", Value = $"{demandRatio:F1}x", IconCssClass = "bi bi-people", IconBgCssClass = "demand" });
+                // 1. ارزش معاملات
+                items.Add(new MarketConditionItem { Title = "ارزش معاملات", Value = (stats.TotalValue / 10_000_000_000_000M).ToString("F1"), Unit = "همت", IconCssClass = "bi bi-cash-stack", IconBgCssClass = "value" });
+                // 2. حجم معاملات
+                items.Add(new MarketConditionItem { Title = "حجم معاملات", Value = (stats.TotalVolume).ToString("F1"), Unit = "تن", IconCssClass = "bi bi-truck", IconBgCssClass = "volume" });
+                // 3. شاخص رقابت
+                decimal competitionIndex = stats.TotalBaseValue > 0 ? ((stats.TotalFinalValue - stats.TotalBaseValue) / stats.TotalBaseValue) * 100 : 0;
+                items.Add(new MarketConditionItem { Title = "شاخص رقابت", Value = $"{competitionIndex:+#.##;-#.##;0.0}%", IconCssClass = "bi bi-fire", IconBgCssClass = "competition", ValueState = competitionIndex > 0 ? ValueState.Positive : (competitionIndex < 0 ? ValueState.Negative : ValueState.Neutral) });
+                // 4. قدرت تقاضا
+                decimal demandRatio = stats.TotalSupply > 0 ? stats.TotalDemand / stats.TotalSupply : 0;
+                items.Add(new MarketConditionItem { Title = "قدرت تقاضا", Value = $"{demandRatio:F1}x", IconCssClass = "bi bi-people", IconBgCssClass = "demand" });
+            }
 
             return new MarketConditionsData { Items = items };
-        }
-        
-        private HashSet<int> GetHierarchyForSubGroup(AppDataContext context, int subGroupId)
-        {
-            var commodityIds = context.Commodities.Where(g => g.ParentId == subGroupId).Select(g => g.Id).ToHashSet();
-            return commodityIds;
         }
         #endregion CommodityActivities
 
         #region UpcomingOffers
-        public async Task<UpcomingOffersData> GetUpcomingOffersAsync(int groupId)
+        public async Task<UpcomingOffersData> GetUpcomingOffersAsync(int subGroupId)
         {
-            using var context = _contextFactory.CreateDbContext();
+            using var context = await _contextFactory.CreateDbContextAsync();
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            var hierarchy = GetHierarchyForSubGroup(context, groupId);
-
-            var futureOffers = await context.Offers
-                .Where(o => string.Compare(o.OfferDate, todayPersian) > 0 && hierarchy.Contains(o.CommodityId))
-                .OrderBy(o => o.OfferDate)
-                .Take(10) // Limit to a reasonable number of upcoming offers
+            // بازنویسی با الگوی پایدار: کوئری Join ساده برای واکشی داده‌ها.
+            // دستور Take(10) در این سطح از پیچیدگی معمولاً مشکلی ایجاد نمی‌کند،
+            // اما برای یکپارچگی کامل، آن را هم به حافظه منتقل می‌کنیم.
+            var futureOffersData = await context.Offers
+                .Join(context.Commodities,
+                    offer => offer.CommodityId,
+                    commodity => commodity.Id,
+                    (offer, commodity) => new { offer, commodity })
+                .Where(x => string.Compare(x.offer.OfferDate, todayPersian) > 0 && x.commodity.ParentId == subGroupId)
+                .Join(context.Suppliers,
+                    x => x.offer.SupplierId,
+                    supplier => supplier.Id,
+                    (x, supplier) => new
+                    {
+                        x.offer.OfferDate,
+                        CommodityName = x.commodity.PersianName,
+                        SupplierName = supplier.PersianName,
+                        x.offer.Id
+                    })
                 .ToListAsync();
 
-            if (!futureOffers.Any())
-            {
-                return new UpcomingOffersData();
-            }
-
-            var commodities = await context.Commodities.ToDictionaryAsync(c => c.Id);
-            var suppliers = await context.Suppliers.ToDictionaryAsync(s => s.Id);
-
-            var items = futureOffers.Select(offer =>
-            {
-                var offerDate = _dateHelper.GetGregorian(offer.OfferDate);
-                var pc = new PersianCalendar();
-
-                return new UpcomingOfferItem
+            // مرتب‌سازی و انتخاب ۱۰ عرضه اول در حافظه انجام می‌شود.
+            var items = futureOffersData
+                .OrderBy(data => data.OfferDate)
+                .Take(10)
+                .Select(data =>
                 {
-                    DayOfWeek = GetPersianDayOfWeek(offerDate.DayOfWeek),
-                    DayOfMonth = pc.GetDayOfMonth(offerDate).ToString(),
-                    Title = commodities.GetValueOrDefault(offer.CommodityId)?.PersianName ?? "کالای نامشخص",
-                    Subtitle = $"توسط {suppliers.GetValueOrDefault(offer.SupplierId)?.PersianName ?? "عرضه‌کننده نامشخص"}"
-                };
-            }).ToList();
+                    var offerDate = _dateHelper.GetGregorian(data.OfferDate);
+                    var pc = new PersianCalendar();
+
+                    return new UpcomingOfferItem
+                    {
+                        DayOfWeek = GetPersianDayOfWeek(offerDate.DayOfWeek),
+                        DayOfMonth = pc.GetDayOfMonth(offerDate).ToString(),
+                        Title = data.CommodityName ?? "کالای نامشخص",
+                        Subtitle = $"توسط {data.SupplierName ?? "عرضه‌کننده نامشخص"}",
+                        Type = UpcomingOfferType.Commodity,
+                        UrlName = data.Id.ToString()
+                    };
+                }).ToList();
 
             return new UpcomingOffersData { Items = items };
         }
+        public async Task<UpcomingOffersData> GetTodayOffersAsync(int subGroupId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
+            // بازنویسی با الگوی پایدار: کوئری Join ساده برای واکشی داده‌ها.
+            // دستور Take(10) در این سطح از پیچیدگی معمولاً مشکلی ایجاد نمی‌کند،
+            // اما برای یکپارچگی کامل، آن را هم به حافظه منتقل می‌کنیم.
+            var futureOffersData = await context.Offers
+                .Join(context.Commodities,
+                    offer => offer.CommodityId,
+                    commodity => commodity.Id,
+                    (offer, commodity) => new { offer, commodity })
+                .Where(x => string.Compare(x.offer.OfferDate, todayPersian) == 0 && x.commodity.ParentId == subGroupId)
+                .Join(context.Suppliers,
+                    x => x.offer.SupplierId,
+                    supplier => supplier.Id,
+                    (x, supplier) => new
+                    {
+                        x.offer.OfferDate,
+                        CommodityName = x.commodity.PersianName,
+                        SupplierName = supplier.PersianName,
+                        x.offer.Id
+                    })
+                .ToListAsync();
+
+            // مرتب‌سازی و انتخاب ۱۰ عرضه اول در حافظه انجام می‌شود.
+            var items = futureOffersData
+                .OrderBy(data => data.OfferDate)
+                .Take(10)
+                .Select(data =>
+                {
+                    var offerDate = _dateHelper.GetGregorian(data.OfferDate);
+                    var pc = new PersianCalendar();
+
+                    return new UpcomingOfferItem
+                    {
+                        DayOfWeek = GetPersianDayOfWeek(offerDate.DayOfWeek),
+                        DayOfMonth = pc.GetDayOfMonth(offerDate).ToString(),
+                        Title = data.CommodityName ?? "کالای نامشخص",
+                        Subtitle = $"توسط {data.SupplierName ?? "عرضه‌کننده نامشخص"}",
+                        Type = UpcomingOfferType.Commodity,
+                        UrlName = data.Id.ToString()
+                    };
+                }).ToList();
+
+            return new UpcomingOffersData { Items = items };
+        }
         private string GetPersianDayOfWeek(DayOfWeek dayOfWeek)
         {
             return dayOfWeek switch
