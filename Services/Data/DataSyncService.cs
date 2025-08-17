@@ -29,31 +29,31 @@ namespace IME.SpotDataApi.Services.Data
 
                 try
                 {
-                    //await SyncBasicInformation<Broker>($"/{version}/spot/Brokers", stoppingToken);
-                    //await SyncBasicInformation<BuyMethod>($"/{version}/spot/BuyMethods", stoppingToken);
-                    //await SyncBasicInformation<Commodity>($"/{version}/spot/Commodities", stoppingToken);
-                    //await SyncBasicInformation<Group>($"/{version}/spot/Groups", stoppingToken);
-                    //await SyncBasicInformation<SubGroup>($"/{version}/spot/SubGroups", stoppingToken);
-                    //await SyncBasicInformation<MainGroup>($"/{version}/spot/MainGroups", stoppingToken);
-                    //await SyncBasicInformation<OfferMode>($"/{version}/spot/OfferModes", stoppingToken);
-                    //await SyncBasicInformation<PackagingType>($"/{version}/spot/PackagingTypes", stoppingToken);
-                    //await SyncBasicInformation<SettlementType>($"/{version}/spot/SettlementTypes", stoppingToken);
-                    //await SyncBasicInformation<SecurityType>($"/{version}/spot/SecurityTypes", stoppingToken);
-                    //await SyncBasicInformation<OfferType>($"/{version}/spot/OfferTypes", stoppingToken);
-                    //await SyncBasicInformation<Manufacturer>($"/{version}/spot/Manufacturers", stoppingToken);
-                    //await SyncBasicInformation<Supplier>($"/{version}/spot/Suppliers", stoppingToken);
-                    //await SyncBasicInformation<MeasurementUnit>($"/{version}/spot/MeasurementUnits", stoppingToken);
-                    //await SyncBasicInformation<CurrencyUnit>($"/{version}/spot/CurrencyUnits", stoppingToken);
-                    //await SyncBasicInformation<ContractType>($"/{version}/spot/ContractTypes", stoppingToken);
-                    //await SyncBasicInformation<DeliveryPlace>($"/{version}/spot/DeliveryPlaces", stoppingToken);
-                    //await SyncBasicInformation<TradingHall>($"/{version}/spot/TradingHalls", stoppingToken);
-                    //await SyncBasicInformation<Tender>($"/{version}/spot/Tenders", stoppingToken);
+                    await SyncBasicInformation<Broker>($"/{version}/spot/Brokers", stoppingToken);
+                    await SyncBasicInformation<BuyMethod>($"/{version}/spot/BuyMethods", stoppingToken);
+                    await SyncBasicInformation<Commodity>($"/{version}/spot/Commodities", stoppingToken);
+                    await SyncBasicInformation<Group>($"/{version}/spot/Groups", stoppingToken);
+                    await SyncBasicInformation<SubGroup>($"/{version}/spot/SubGroups", stoppingToken);
+                    await SyncBasicInformation<MainGroup>($"/{version}/spot/MainGroups", stoppingToken);
+                    await SyncBasicInformation<OfferMode>($"/{version}/spot/OfferModes", stoppingToken);
+                    await SyncBasicInformation<PackagingType>($"/{version}/spot/PackagingTypes", stoppingToken);
+                    await SyncBasicInformation<SettlementType>($"/{version}/spot/SettlementTypes", stoppingToken);
+                    await SyncBasicInformation<SecurityType>($"/{version}/spot/SecurityTypes", stoppingToken);
+                    await SyncBasicInformation<OfferType>($"/{version}/spot/OfferTypes", stoppingToken);
+                    await SyncBasicInformation<Manufacturer>($"/{version}/spot/Manufacturers", stoppingToken);
+                    await SyncBasicInformation<Supplier>($"/{version}/spot/Suppliers", stoppingToken);
+                    await SyncBasicInformation<MeasurementUnit>($"/{version}/spot/MeasurementUnits", stoppingToken);
+                    await SyncBasicInformation<CurrencyUnit>($"/{version}/spot/CurrencyUnits", stoppingToken);
+                    await SyncBasicInformation<ContractType>($"/{version}/spot/ContractTypes", stoppingToken);
+                    await SyncBasicInformation<DeliveryPlace>($"/{version}/spot/DeliveryPlaces", stoppingToken);
+                    await SyncBasicInformation<TradingHall>($"/{version}/spot/TradingHalls", stoppingToken);
+                    await SyncBasicInformation<Tender>($"/{version}/spot/Tenders", stoppingToken);
 
 
-                    //await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-7), DateTime.Now.AddDays(25), stoppingToken);
-                    //await SyncOperationalResource<TradeReport>($"/{version}/spot/reports/Trades", DateTime.Now.AddDays(-5), DateTime.Now, stoppingToken);
-                    //await SyncOperationalResource<NewsNotification>("api/Notifications/NewsNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
-                    //await SyncOperationalResource<SpotNotification>("/api/Notifications/SpotNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
+                    await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-7), DateTime.Now.AddDays(25), stoppingToken);
+                    await SyncOperationalResource<TradeReport>($"/{version}/spot/reports/Trades", DateTime.Now.AddDays(-5), DateTime.Now, stoppingToken);
+                    await SyncOperationalResource<NewsNotification>("api/Notifications/NewsNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
+                    await SyncOperationalResource<SpotNotification>("/api/Notifications/SpotNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
 
 
                     _logger.LogInformation("چرخه همگام‌سازی موازی با موفقیت به پایان رسید.");
