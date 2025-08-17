@@ -38,6 +38,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IMarketsService, MarketsService>();
 builder.Services.AddScoped<IMainGroupService, MainGroupService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<ISubGroupService, SubGroupService>();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
