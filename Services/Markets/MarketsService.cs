@@ -55,19 +55,28 @@ namespace IME.SpotDataApi.Services.Markets
                                           SubGroupName = subGroup.PersianName
                                       };
 
-            var activeMarketData = await tradesWithHierarchy
+            // به دلیل محدودیت SQLite، داده‌ها را قبل از مرتب‌سازی نهایی به حافظه منتقل می‌کنیم
+            var rawData = await tradesWithHierarchy.ToListAsync();
+
+            var activeMarketData = rawData
                 .GroupBy(x => x.MainGroup)
-                .Select(g => new
-                {
-                    MainGroupId = g.Key.Id,
-                    TotalTradeValue = g.Sum(x => x.TradeValue),
-                    TotalBaseValue = g.Sum(x => x.OfferBasePrice * x.TradeVolume / 1000),
-                    TopSubGroups = g.GroupBy(x => x.SubGroupName)
-                                    .OrderByDescending(sg => sg.Sum(t => t.TradeValue))
-                                    .Select(sg => sg.Key)
-                                    .Take(3)
-                })
-                .ToDictionaryAsync(d => d.MainGroupId);
+                .ToDictionary(
+                    g => g.Key.Id,
+                    g =>
+                    {
+                        var topSubGroups = g
+                            .GroupBy(x => x.SubGroupName)
+                            .OrderByDescending(sg => sg.Sum(t => t.TradeValue)) // مرتب‌سازی در حافظه
+                            .Select(sg => sg.Key)
+                            .Take(3);
+
+                        return new
+                        {
+                            TotalTradeValue = g.Sum(x => x.TradeValue),
+                            TotalBaseValue = g.Sum(x => x.OfferBasePrice * x.TradeVolume / 1000),
+                            TopSubGroups = topSubGroups
+                        };
+                    });
 
             var allMainGroups = await context.MainGroups.ToListAsync();
 
