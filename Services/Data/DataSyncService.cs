@@ -11,7 +11,7 @@ namespace IME.SpotDataApi.Services.Data
         private readonly ILogger<DataSyncService> _logger;
         private readonly IServiceProvider _serviceProvider;
         // کل چرخه همگام‌سازی هر یک ساعت یکبار اجرا می‌شود تا محدودیت نرخ رعایت شود
-        private readonly TimeSpan _cycleDelay = TimeSpan.FromHours(1);
+        private readonly TimeSpan _cycleDelay = TimeSpan.FromMinutes(15);
 
         public DataSyncService(ILogger<DataSyncService> logger, IServiceProvider serviceProvider)
         {
