@@ -6,6 +6,7 @@ using IME.SpotDataApi.Models.General;
 using IME.SpotDataApi.Models.Notification;
 using IME.SpotDataApi.Repository;
 using IME.SpotDataApi.Services.Authenticate;
+using IME.SpotDataApi.Services.CommodityLevel;
 using IME.SpotDataApi.Services.Dashboard;
 using IME.SpotDataApi.Services.Data;
 using IME.SpotDataApi.Services.GroupLevel;
@@ -42,7 +43,7 @@ builder.Services.AddScoped<IMainGroupService, MainGroupService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<ISubGroupService, SubGroupService>();
 builder.Services.AddScoped<IOfferDetailsService, OfferDetailsService>();
-
+builder.Services.AddScoped<ICommodityService, CommodityService>();
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
