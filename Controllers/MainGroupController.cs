@@ -38,5 +38,19 @@ namespace IME.SpotDataApi.Controllers
             var data = await _mainGroupService.GetUpcomingOffersAsync(mainGroupId);
             return Ok(data);
         }
+        [HttpGet("{mainGroupId}/market-share")]
+        [ProducesResponseType(typeof(MarketShortcutsData), 200)]
+        public async Task<IActionResult> GetMarketShare(int mainGroupId)
+        {
+            var data = await _mainGroupService.GetMarketShareAsync(mainGroupId);
+            return Ok(data);
+        }
+        [HttpGet("{mainGroupId}/trade-share")]
+        [ProducesResponseType(typeof(MarketShortcutsData), 200)]
+        public async Task<IActionResult> GetTradeShare(int mainGroupId)
+        {
+            var data = await _mainGroupService.GetTradeShareAsync(mainGroupId);
+            return Ok(data);
+        }
     }
 }

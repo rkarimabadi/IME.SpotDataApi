@@ -59,5 +59,12 @@ namespace IME.SpotDataApi.Controllers
             var data = await _marketsService.GetMarketListAsync();
             return Ok(data);
         }
+        
+        [HttpGet("top-subgroups")]
+        public async Task<IActionResult> GetTopSubGroups()
+        {
+            var data = await _marketsService.GetMarketTopSubGroupsAsync();
+            return Ok(data);
+        }
     }
 }

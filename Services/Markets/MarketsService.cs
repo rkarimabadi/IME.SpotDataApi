@@ -16,6 +16,7 @@ namespace IME.SpotDataApi.Services.Markets
         Task<MarketHeatmapData> GetMarketHeatmapDataAsync();
         Task<MarketShortcutsData> GetMarketShortcutsAsync();
         Task<List<ItemInfo>> GetMarketListAsync();
+        Task<MarketContactsData> GetMarketTopSubGroupsAsync();
     }
 
     /// <summary>
@@ -265,64 +266,95 @@ namespace IME.SpotDataApi.Services.Markets
         #region MarketHeatmap
         public async Task<MarketHeatmapData> GetMarketHeatmapDataAsync()
         {
-            // این متد به دلیل پیچیدگی منطق و نیاز به محاسبات چندمرحله‌ای،
-            // با الگوی واکشی داده‌های اولیه و سپس پردازش در حافظه بهینه شده است.
-            using var context = await _contextFactory.CreateDbContextAsync();
+            using var context = _contextFactory.CreateDbContext();
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            var tradesWithHierarchy = await context.TradeReports
-                .Where(t => t.TradeDate == todayPersian)
-                .Join(context.Offers, t => t.OfferId, o => o.Id, (t, o) => new { t, o })
-                .Join(context.Commodities, j => j.o.CommodityId, c => c.Id, (j, c) => new { j.t, j.o, c })
-                .Join(context.SubGroups, j => j.c.ParentId, sg => sg.Id, (j, sg) => new { j.t, j.o, sg })
-                .Join(context.Groups, j => j.sg.ParentId, g => g.Id, (j, g) => new { j.t, j.o, g })
-                .Join(context.MainGroups, j => j.g.ParentId, mg => mg.Id, (j, mg) => new { j.t, j.o, mg })
-                .ToListAsync();
+            var mainGroups = await context.MainGroups.ToListAsync();
+            var todayTrades = await context.TradeReports.Where(t => t.TradeDate == todayPersian).ToListAsync();
+            var todayOffers = await context.Offers.Where(o => o.OfferDate == todayPersian).ToListAsync();
 
-            var activeGroupMetrics = tradesWithHierarchy
-                .GroupBy(x => x.mg)
-                .Select(g =>
-                {
-                    decimal totalFinalValue = g.Sum(x => x.t.FinalWeightedAveragePrice * x.t.TradeVolume);
-                    decimal totalBaseValue = g.Sum(x => x.t.OfferBasePrice * x.t.TradeVolume);
-                    decimal heat = totalBaseValue > 0 ? ((totalFinalValue - totalBaseValue) / totalBaseValue) * 100 : 0;
-                    decimal demand = g.Sum(x => x.t.DemandVolume);
-                    decimal supply = g.Sum(x => x.o.OfferVol);
-                    decimal realization = g.Sum(x => x.o.InitPrice * x.o.OfferVol) > 0 ? g.Sum(x => x.t.TradeValue * 1000) / g.Sum(x => x.o.InitPrice * x.o.OfferVol * 1000) * 100 : 0;
-
-                    return new { MainGroup = g.Key, Heat = heat, DemandRatio = supply > 0 ? demand / supply : 0, RealizationRatio = realization };
+            // محاسبه شاخص‌های حرارت برای گروه‌های فعال
+            var activeGroupMetrics = mainGroups
+                .Select(mg => {
+                    var hierarchy = GetHierarchyForMainGroup(context, mg.Id);
+                    var offerIdsInGroup = todayOffers
+                        .Where(o => hierarchy.CommodityIds.Contains(o.CommodityId))
+                        .Select(o => o.Id)
+                        .ToHashSet();
+                    
+                    var tradesInGroup = todayTrades.Where(t => offerIdsInGroup.Contains(t.OfferId)).ToList();
+                    
+                    decimal heat = 0;
+                    if (tradesInGroup.Any())
+                    {
+                    decimal totalFinalValue = tradesInGroup.Sum(t => t.FinalWeightedAveragePrice * t.TradeVolume);
+                    decimal totalBaseValue = tradesInGroup.Sum(t => t.OfferBasePrice * t.TradeVolume);
+                    heat = totalBaseValue > 0 ? ((totalFinalValue - totalBaseValue) / totalBaseValue) * 100 : 0;
+                    }
+                    return new { MainGroup = mg, Heat = heat, Trades = tradesInGroup, Offers = todayOffers.Where(o => offerIdsInGroup.Contains(o.Id)).ToList() };
                 })
                 .OrderByDescending(x => x.Heat)
                 .ToList();
 
-            var allMainGroups = await context.MainGroups.ToListAsync();
             var heatmapItems = new List<MarketHeatmapItem>();
             var rankedGroups = new HashSet<int>();
 
-            // تخصیص جایگاه‌ها بر اساس منطق پیچیده
-            if (activeGroupMetrics.Count > 0)
+            // تخصیص جایگاه‌های High
+            var highRankers = activeGroupMetrics.Take(2).ToList();
+            if (highRankers.Count > 0)
             {
-                var top = activeGroupMetrics[0];
-                heatmapItems.Add(new MarketHeatmapItem { Title = top.MainGroup.PersianName, Code = top.MainGroup.Id, Rank = MarketHeatRank.High, Subtitle = "بیشترین ارزش معاملات", Value = $"+{top.Heat:F1}%" });
-                rankedGroups.Add(top.MainGroup.Id);
+                var topHigh = highRankers[0];
+                heatmapItems.Add(new MarketHeatmapItem { Title = topHigh.MainGroup.PersianName, Code = topHigh.MainGroup.Id, Rank = MarketHeatRank.High, Subtitle = "بیشترین ارزش معاملات", Value = $"+{topHigh.Heat:F1}%" });
+                rankedGroups.Add(topHigh.MainGroup.Id);
             }
-            if (activeGroupMetrics.Count > 1)
+            if (highRankers.Count > 1)
             {
-                var second = activeGroupMetrics[1];
-                heatmapItems.Add(new MarketHeatmapItem { Title = second.MainGroup.PersianName, Code = second.MainGroup.Id, Rank = MarketHeatRank.High, Value = $"{second.DemandRatio:F1}x" });
-                rankedGroups.Add(second.MainGroup.Id);
+                var secondHigh = highRankers[1];
+                var demandRatio = secondHigh.Offers.Sum(o => o.OfferVol) > 0 ? secondHigh.Trades.Sum(t => t.DemandVolume) / secondHigh.Offers.Sum(o => o.OfferVol) : 0;
+                heatmapItems.Add(new MarketHeatmapItem { Title = secondHigh.MainGroup.PersianName, Code = secondHigh.MainGroup.Id, Rank = MarketHeatRank.High, Value = $"{demandRatio:F1}x" });
+                rankedGroups.Add(secondHigh.MainGroup.Id);
             }
-            // ... (ادامه منطق برای رتبه‌های دیگر)
+
+            // تخصیص جایگاه‌های Medium
+            var mediumRankers = activeGroupMetrics.Skip(2).Take(2).ToList();
+            if (mediumRankers.Count > 0)
+            {
+                var topMedium = mediumRankers[0];
+                var realizationRatio = topMedium.Offers.Sum(o => o.InitPrice * o.OfferVol) > 0 ? topMedium.Trades.Sum(t => t.TradeValue * 1000) / topMedium.Offers.Sum(o => o.InitPrice * o.OfferVol * 1000) * 100 : 0;
+                heatmapItems.Add(new MarketHeatmapItem { Title = topMedium.MainGroup.PersianName, Code = topMedium.MainGroup.Id, Rank = MarketHeatRank.Medium, Subtitle = "نرخ تحقق", Value = $"{realizationRatio:F0}%" });
+                rankedGroups.Add(topMedium.MainGroup.Id);
+            }
+            if (mediumRankers.Count > 1)
+            {
+                var secondMedium = mediumRankers[1];
+                heatmapItems.Add(new MarketHeatmapItem { Title = secondMedium.MainGroup.PersianName, Code = secondMedium.MainGroup.Id, Rank = MarketHeatRank.Medium });
+                rankedGroups.Add(secondMedium.MainGroup.Id);
+            }
 
             // پر کردن بقیه لیست با گروه‌های باقی‌مانده
-            var remainingGroups = allMainGroups.Where(mg => !rankedGroups.Contains(mg.Id)).ToList();
-            foreach (var group in remainingGroups)
+            var remainingGroups = mainGroups.Where(mg => !rankedGroups.Contains(mg.Id)).ToList();
+            
+            var lowRankers = remainingGroups.Take(2).ToList();
+            foreach(var group in lowRankers)
+            {
+                heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Code = group.Id, Rank = MarketHeatRank.Low });
+                rankedGroups.Add(group.Id);
+            }
+
+            var neutralRankers = mainGroups.Where(mg => !rankedGroups.Contains(mg.Id)).ToList();
+            foreach(var group in neutralRankers)
             {
                 heatmapItems.Add(new MarketHeatmapItem { Title = group.PersianName, Code = group.Id, Rank = MarketHeatRank.Neutral });
             }
 
-
             return new MarketHeatmapData { Items = heatmapItems };
+        }
+        private (HashSet<int> GroupIds, HashSet<int> SubGroupIds, HashSet<int> CommodityIds) GetHierarchyForMainGroup(AppDataContext context, int mainGroupId)
+        {
+            var groupIds = context.Groups.Where(g => g.ParentId == mainGroupId).Select(g => g.Id).ToHashSet();
+            var subGroupIds = context.SubGroups.Where(sg => sg.ParentId.HasValue && groupIds.Contains(sg.ParentId.Value)).Select(sg => sg.Id).ToHashSet();
+            var commodityIds = context.Commodities.Where(c => c.ParentId.HasValue && subGroupIds.Contains(c.ParentId.Value)).Select(c => c.Id).ToHashSet();
+            return (groupIds, subGroupIds, commodityIds);
         }
         #endregion MarketHeatmap
 
@@ -336,24 +368,156 @@ namespace IME.SpotDataApi.Services.Markets
         #endregion marketlist
 
         #region MarketShortcuts
-        public Task<MarketShortcutsData> GetMarketShortcutsAsync()
+        public async Task<MarketShortcutsData> GetMarketShortcutsAsync()
         {
-            // این متد به دیتابیس دسترسی ندارد و نیازی به تغییر ندارد
-            var data = new MarketShortcutsData
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+
+            var activeMainGroupIds = await context.Offers
+                .Where(o => o.OfferDate == todayPersian)
+                .Join(context.Commodities, offer => offer.CommodityId, commodity => commodity.Id, (offer, commodity) => commodity)
+                .Join(context.SubGroups, commodity => commodity.ParentId, subGroup => subGroup.Id, (commodity, subGroup) => subGroup)
+                .Join(context.Groups, subGroup => subGroup.ParentId, grp => grp.Id, (subGroup, grp) => grp)
+                .Where(grp => grp.ParentId.HasValue)
+                .Select(grp => grp.ParentId.Value)
+                .Distinct()
+                .ToHashSetAsync();
+
+            // لیست پایه میانبرها با استایل پیش‌فرض حالت فعال
+            var shortcuts = new List<MarketShortcutItem>
             {
-                Items = new List<MarketShortcutItem>
-                {
-                    new() { Title = "اموال غیر منقول", Code = 6, IconCssClass = "bi bi-house-door-fill", ThemeCssClass = "real-estate" },
-                    new() { Title = "بازار فرعی", Code = 7, IconCssClass = "bi bi-shop", ThemeCssClass = "secondary" },
-                    new() { Title = "صنعتی", Code = 1, IconCssClass = "bi bi-building", ThemeCssClass = "industrial" },
-                    new() { Title = "فرآورده های نفتی", Code = 5, IconCssClass = "bi bi-fuel-pump-fill", ThemeCssClass = "oil-products" },
-                    new() { Title = "معدنی", Code = 4, IconCssClass = "bi bi-gem", ThemeCssClass = "mineral" },
-                    new() { Title = "پتروشیمی", Code = 3, IconCssClass = "bi bi-droplet-fill", ThemeCssClass = "petro" },
-                    new() { Title = "کشاورزی", Code = 2, IconCssClass = "bi bi-tree-fill", ThemeCssClass = "agri" }
-                }
+                new() { Title = "صنعتی", Code = 1, IconCssClass = "bi bi-building", ThemeCssClass = "industrial" },
+                new() { Title = "کشاورزی", Code = 2, IconCssClass = "bi bi-tree-fill", ThemeCssClass = "agri" },
+                new() { Title = "پتروشیمی", Code = 3, IconCssClass = "bi bi-droplet-fill", ThemeCssClass = "petro" },
+                new() { Title = "معدنی", Code = 4, IconCssClass = "bi bi-gem", ThemeCssClass = "mineral" },
+                new() { Title = "فرآورده های نفتی", Code = 5, IconCssClass = "bi bi-fuel-pump-fill", ThemeCssClass = "oil-products" },
+                new() { Title = "اموال غیر منقول", Code = 6, IconCssClass = "bi bi-house-door-fill", ThemeCssClass = "real-estate" },
+                new() { Title = "بازار فرعی", Code = 7, IconCssClass = "bi bi-shop", ThemeCssClass = "fork" }
             };
-            return Task.FromResult(data);
+
+            var activeShortcuts = new List<MarketShortcutItem>();
+            var inactiveShortcuts = new List<MarketShortcutItem>();
+
+            foreach (var item in shortcuts)
+            {
+                bool isActive = activeMainGroupIds.Contains(item.Code);
+
+                if (isActive)
+                {
+                    activeShortcuts.Add(item);
+                }
+                else
+                {
+                    item.ThemeCssClass = "secondary";
+                    inactiveShortcuts.Add(item);
+                }
+            }
+
+            var orderedShortcuts = activeShortcuts.Concat(inactiveShortcuts).ToList();
+
+            var data = new MarketShortcutsData { Items = orderedShortcuts };
+            return data;
         }
         #endregion MarketShortcuts
+
+        #region MarketTopSubGroups
+        public async Task<MarketContactsData> GetMarketTopSubGroupsAsync()
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var todayPersian = _dateHelper.GetPersian(System.DateTime.Now);
+
+            // 1. واکشی و شمارش تعداد عرضه برای تمام زیرگروه‌های فعال در روز جاری
+            var allActiveSubGroups = await context.Offers
+                .Where(o => o.OfferDate == todayPersian)
+                .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => c)
+                .Join(context.SubGroups, c => c.ParentId, sg => sg.Id, (c, sg) => sg)
+                .Join(context.Groups, sg => sg.ParentId, g => g.Id, (sg, g) => new { SubGroup = sg, Group = g })
+                .Join(context.MainGroups, j => j.Group.ParentId, mg => mg.Id, (j, mg) => new { j.SubGroup, j.Group, MainGroup = mg })
+                // رفع خطا: گروه‌بندی بر اساس انواع داده‌ای ساده (Primitive Types)
+                .GroupBy(x => new { 
+                    SubGroupId = x.SubGroup.Id,
+                    SubGroupName = x.SubGroup.PersianName,
+                    GroupId = x.Group.Id,
+                    GroupName = x.Group.PersianName,
+                    MainGroupId = x.MainGroup.Id,
+                    MainGroupName = x.MainGroup.PersianName
+                })
+                .Select(g => new
+                {
+                    g.Key.SubGroupId,
+                    g.Key.SubGroupName,
+                    g.Key.GroupId,
+                    g.Key.GroupName,
+                    g.Key.MainGroupId,
+                    g.Key.MainGroupName,
+                    OfferCount = g.Count()
+                })
+                .OrderByDescending(x => x.OfferCount)
+                .ToListAsync();
+
+            // 2. الگوریتم انتخاب 4 مورد برتر با اولویت‌های مشخص
+            var finalSelection = new List<dynamic>();
+            var usedMainGroupIds = new HashSet<int>();
+            var usedGroupIds = new HashSet<int>();
+            var usedSubGroupIds = new HashSet<int>();
+
+            // پاس اول: انتخاب بر اساس گروه اصلی منحصر به فرد
+            foreach (var item in allActiveSubGroups.Where(i => !usedMainGroupIds.Contains(i.MainGroupId)))
+            {
+                if (finalSelection.Count >= 4) break;
+                finalSelection.Add(item);
+                usedMainGroupIds.Add(item.MainGroupId);
+                usedGroupIds.Add(item.GroupId);
+                usedSubGroupIds.Add(item.SubGroupId);
+            }
+
+            // پاس دوم: تکمیل لیست بر اساس گروه منحصر به فرد
+            if (finalSelection.Count < 4)
+            {
+                foreach (var item in allActiveSubGroups.Where(i => !usedSubGroupIds.Contains(i.SubGroupId) && !usedGroupIds.Contains(i.GroupId)))
+                {
+                    if (finalSelection.Count >= 4) break;
+                    finalSelection.Add(item);
+                    usedGroupIds.Add(item.GroupId);
+                    usedSubGroupIds.Add(item.SubGroupId);
+                }
+            }
+
+            // پاس سوم: تکمیل لیست با موارد باقی‌مانده بر اساس بیشترین تعداد عرضه
+            if (finalSelection.Count < 4)
+            {
+                foreach (var item in allActiveSubGroups.Where(i => !usedSubGroupIds.Contains(i.SubGroupId)))
+                {
+                    if (finalSelection.Count >= 4) break;
+                    finalSelection.Add(item);
+                    usedSubGroupIds.Add(item.SubGroupId);
+                }
+            }
+
+            // 3. تبدیل داده‌های منتخب به مدل خروجی
+            var items = finalSelection.Select(item =>
+            {
+                // رفع خطا: دسترسی به اعضای tuple با نام‌های پیش‌فرض Item1 و Item2
+                var visuals = GetMainGroupVisuals(item.MainGroupName);
+                return new MarketContactItem
+                {
+                    Title = item.SubGroupName,
+                    Subtitle = item.GroupName,
+                    IconCssClass = $"bi {visuals.Item1}",
+                    AvatarCssClass = visuals.Item2,
+                    UrlName = $"{item.MainGroupId}/{item.GroupId}/{item.SubGroupId}"
+                };
+            }).ToList();
+            
+            // 4. در صورت نیاز، لیست را با آیتم‌های پیش‌فرض به اندازه 4 پر می‌کنیم
+            while (items.Count < 4)
+            {
+                items.Add(new MarketContactItem { Title = "...", Subtitle = "داده‌ای یافت نشد", IconCssClass = "bi bi-circle", AvatarCssClass = "disabled" });
+            }
+
+            return new MarketContactsData { Items = items };
+        }
+        #endregion MarketTopSubGroups
+ 
     }
 }
