@@ -11,5 +11,7 @@ namespace IME.SpotDataApi.Services.CommodityLevel
         Task<IEnumerable<MainPlayer>> GetMainPlayersAsync(int commodityId);
         Task<MarketAbsorptionData> GetMarketAbsorptionAsync(int commodityId);
         Task<PriceViewModel> GetPriceTrendsAsync(int commodityId);
+        Task<UpcomingOffersData> GetOfferHistoryAsync(int commodityId);
+        Task<DistributedAttributesData> GetPlayerDistributionAsync(int commodityId);
     }
 }

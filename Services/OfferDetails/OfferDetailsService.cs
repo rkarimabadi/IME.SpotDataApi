@@ -92,11 +92,11 @@ namespace IME.SpotDataApi.Services.OfferDetails
                             PackagingType = packagingType.PersianName,
                             HierarchyItems = new List<HierarchyItem>
                             {
-                                new HierarchyItem { Id = offer.TradingHallId, Name = offer.OfferRing, IsActive = true },
-                                new HierarchyItem { Id = h.MainGroup.Id, Name = h.MainGroup.PersianName, IsActive = true },
-                                new HierarchyItem { Id = h.Group.Id, Name = h.Group.PersianName, IsActive = true },
-                                new HierarchyItem { Id = h.SubGroup.Id, Name = h.SubGroup.PersianName, IsActive = true },
-                                new HierarchyItem { Id = offer.CommodityId, Name = h.Commodity.Symbol, IsActive = false }
+                                new HierarchyItem { Id = offer.TradingHallId, Name = offer.OfferRing, Type = "Ring", IsActive = true },
+                                new HierarchyItem { Id = h.MainGroup.Id, Name = h.MainGroup.PersianName, Type = "MainGroup", IsActive = true },
+                                new HierarchyItem { Id = h.Group.Id, Name = h.Group.PersianName, Type = "Group", IsActive = true },
+                                new HierarchyItem { Id = h.SubGroup.Id, Name = h.SubGroup.PersianName, Type = "SubGroup", IsActive = true },
+                                new HierarchyItem { Id = offer.CommodityId, Name = h.Commodity.Symbol, Type = "Commodity", IsActive = false }
                             }
                         };
 

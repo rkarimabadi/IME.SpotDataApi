@@ -57,8 +57,8 @@ namespace IME.SpotDataApi.Services.RemoteData
         private async Task<IEnumerable<T>> RetrieveDataFromRemoteApiAsync(DateTime date)
         {
             var stoppingToken  = new CancellationToken();
-            int delayInSeconds = _random.Next(1, 5);
-            await Task.Delay(TimeSpan.FromSeconds(delayInSeconds), stoppingToken);
+            int delayInSeconds = _random.Next(3, 5);
+            await Task.Delay(TimeSpan.FromMinutes(delayInSeconds), stoppingToken);
             var persianDate = _dateHelper.GetPersianYYYYMMDD(date);
             var requestUrl = $"{EndPointPath}?persianDate={persianDate}&pageNumber=1&pageSize=1000&Language=fa";
             var items = new List<T>();

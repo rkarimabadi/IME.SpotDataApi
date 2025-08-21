@@ -70,5 +70,20 @@ namespace IME.SpotDataApi.Controllers
             var data = await _commodityService.GetDistributedAttributesAsync(commodityId);
             return Ok(data);
         }
+
+        [HttpGet("{commodityId}/player-distribution")]
+        [ProducesResponseType(typeof(DistributedAttributesData), 200)]
+        public async Task<IActionResult> GetPlayerDistribution(int commodityId)
+        {
+            var data = await _commodityService.GetPlayerDistributionAsync(commodityId);
+            return Ok(data);
+        }
+        [HttpGet("{commodityId}/offer-history")]
+        [ProducesResponseType(typeof(UpcomingOffersData), 200)]
+        public async Task<IActionResult> GetOfferHistory(int commodityId)
+        {
+            var data = await _commodityService.GetOfferHistoryAsync(commodityId);
+            return Ok(data);
+        }
     }
 }

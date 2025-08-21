@@ -374,7 +374,7 @@ namespace IME.SpotDataApi.Services.Markets
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
             var activeMainGroupIds = await context.Offers
-                .Where(o => o.OfferDate == todayPersian)
+                .Where(o => string.Compare(o.OfferDate, todayPersian) >= 0)
                 .Join(context.Commodities, offer => offer.CommodityId, commodity => commodity.Id, (offer, commodity) => commodity)
                 .Join(context.SubGroups, commodity => commodity.ParentId, subGroup => subGroup.Id, (commodity, subGroup) => subGroup)
                 .Join(context.Groups, subGroup => subGroup.ParentId, grp => grp.Id, (subGroup, grp) => grp)
@@ -428,7 +428,7 @@ namespace IME.SpotDataApi.Services.Markets
 
             // 1. واکشی و شمارش تعداد عرضه برای تمام زیرگروه‌های فعال در روز جاری
             var allActiveSubGroups = await context.Offers
-                .Where(o => o.OfferDate == todayPersian)
+                .Where(o => string.Compare(o.OfferDate, todayPersian) >= 0)
                 .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => c)
                 .Join(context.SubGroups, c => c.ParentId, sg => sg.Id, (c, sg) => sg)
                 .Join(context.Groups, sg => sg.ParentId, g => g.Id, (sg, g) => new { SubGroup = sg, Group = g })
