@@ -370,3 +370,5 @@ FodyWeavers.xsd
 *.dll
 *.xml
 /appsettings.json
+/appsettings_.Development.json
+/appsettings_.Production.json
