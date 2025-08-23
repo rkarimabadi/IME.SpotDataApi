@@ -162,102 +162,78 @@ namespace IME.SpotDataApi.Services.MainGroupLevel
         #endregion CommodityActivities
 
         #region UpcomingOffers
-        public async Task<UpcomingOffersData> GetUpcomingOffersAsync(int subGroupId)
+        public async Task<UpcomingOffersData> GetOfferHistoryAsync(int subGroupId)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
             var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            // بازنویسی با الگوی پایدار: کوئری Join ساده برای واکشی داده‌ها.
-            // دستور Take(10) در این سطح از پیچیدگی معمولاً مشکلی ایجاد نمی‌کند،
-            // اما برای یکپارچگی کامل، آن را هم به حافظه منتقل می‌کنیم.
-            var futureOffersData = await context.Offers
-                .Join(context.Commodities,
-                    offer => offer.CommodityId,
-                    commodity => commodity.Id,
-                    (offer, commodity) => new { offer, commodity })
-                .Where(x => string.Compare(x.offer.OfferDate, todayPersian) > 0 && x.commodity.ParentId == subGroupId)
-                .Join(context.Suppliers,
-                    x => x.offer.SupplierId,
-                    supplier => supplier.Id,
-                    (x, supplier) => new
-                    {
-                        x.offer.OfferDate,
-                        CommodityName = x.commodity.PersianName,
-                        SupplierName = supplier.PersianName,
-                        x.offer.Id
-                    })
-                .ToListAsync();
+            // --- 1. واکشی عرضه‌های آینده ---
+            var futureOffersQuery = context.Offers
+                .Where(o => string.Compare(o.OfferDate, todayPersian) > 0)
+                .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => new { Offer = o, Commodity = c })
+                .Where(x => x.Commodity.ParentId == subGroupId)
+                .Select(x => x.Offer)
+                .OrderBy(o => o.OfferDate);
 
-            // مرتب‌سازی و انتخاب ۱۰ عرضه اول در حافظه انجام می‌شود.
-            var items = futureOffersData
-                .OrderBy(data => data.OfferDate)
-                .Take(10)
-                .Select(data =>
-                {
-                    var offerDate = _dateHelper.GetGregorian(data.OfferDate);
-                    var pc = new PersianCalendar();
+            var futureItems = await ProcessOffersQuery(futureOffersQuery, OfferDateType.Future, context);
 
-                    return new UpcomingOfferItem
-                    {
-                        DayOfWeek = GetPersianDayOfWeek(offerDate.DayOfWeek),
-                        DayOfMonth = pc.GetDayOfMonth(offerDate).ToString(),
-                        Title = data.CommodityName ?? "کالای نامشخص",
-                        Subtitle = $"توسط {data.SupplierName ?? "عرضه‌کننده نامشخص"}",
-                        Type = UpcomingOfferType.Commodity,
-                        UrlName = data.Id.ToString()
-                    };
-                }).ToList();
+            // --- 2. واکشی عرضه‌های امروز ---
+            var todayOffersQuery = context.Offers
+                .Where(o => o.OfferDate == todayPersian)
+                .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => new { Offer = o, Commodity = c })
+                .Where(x => x.Commodity.ParentId == subGroupId)
+                .Select(x => x.Offer);
 
-            return new UpcomingOffersData { Items = items };
+            var todayItems = await ProcessOffersQuery(todayOffersQuery, OfferDateType.Today, context);
+
+            // --- 3. واکشی عرضه‌های گذشته ---
+            var pastOffersQuery = context.Offers
+                .Where(o => string.Compare(o.OfferDate, todayPersian) < 0)
+                .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => new { Offer = o, Commodity = c })
+                .Where(x => x.Commodity.ParentId == subGroupId)
+                .Select(x => x.Offer)
+                .OrderByDescending(o => o.OfferDate)
+                .Take(15);
+
+            var pastItems = await ProcessOffersQuery(pastOffersQuery, OfferDateType.Past, context);
+
+            // --- 4. ترکیب نتایج ---
+            var allItems = todayItems.Concat(futureItems).Concat(pastItems).ToList();
+
+            return new UpcomingOffersData { Items = allItems };
         }
-        public async Task<UpcomingOffersData> GetTodayOffersAsync(int subGroupId)
+
+        private async Task<List<UpcomingOfferItem>> ProcessOffersQuery(IQueryable<Models.Spot.Offer> query, OfferDateType dateType, AppDataContext context)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            var pc = new PersianCalendar();
 
-            // بازنویسی با الگوی پایدار: کوئری Join ساده برای واکشی داده‌ها.
-            // دستور Take(10) در این سطح از پیچیدگی معمولاً مشکلی ایجاد نمی‌کند،
-            // اما برای یکپارچگی کامل، آن را هم به حافظه منتقل می‌کنیم.
-            var futureOffersData = await context.Offers
-                .Join(context.Commodities,
-                    offer => offer.CommodityId,
-                    commodity => commodity.Id,
-                    (offer, commodity) => new { offer, commodity })
-                .Where(x => string.Compare(x.offer.OfferDate, todayPersian) == 0 && x.commodity.ParentId == subGroupId)
-                .Join(context.Suppliers,
-                    x => x.offer.SupplierId,
-                    supplier => supplier.Id,
-                    (x, supplier) => new
-                    {
-                        x.offer.OfferDate,
-                        CommodityName = x.commodity.PersianName,
-                        SupplierName = supplier.PersianName,
-                        x.offer.Id
-                    })
+            var offerData = await query
+                .Join(context.Suppliers, o => o.SupplierId, s => s.Id, (o, s) => new { Offer = o, Supplier = s })
+                .Join(context.Commodities, j => j.Offer.CommodityId, c => c.Id, (j, c) => new
+                {
+                    j.Offer.Id,
+                    j.Offer.OfferDate,
+                    CommodityName = c.PersianName,
+                    SupplierName = j.Supplier.PersianName
+                })
                 .ToListAsync();
 
-            // مرتب‌سازی و انتخاب ۱۰ عرضه اول در حافظه انجام می‌شود.
-            var items = futureOffersData
-                .OrderBy(data => data.OfferDate)
-                .Take(10)
-                .Select(data =>
+            return offerData.Select(data =>
+            {
+                var offerDate = _dateHelper.GetGregorian(data.OfferDate);
+                return new UpcomingOfferItem
                 {
-                    var offerDate = _dateHelper.GetGregorian(data.OfferDate);
-                    var pc = new PersianCalendar();
-
-                    return new UpcomingOfferItem
-                    {
-                        DayOfWeek = GetPersianDayOfWeek(offerDate.DayOfWeek),
-                        DayOfMonth = pc.GetDayOfMonth(offerDate).ToString(),
-                        Title = data.CommodityName ?? "کالای نامشخص",
-                        Subtitle = $"توسط {data.SupplierName ?? "عرضه‌کننده نامشخص"}",
-                        Type = UpcomingOfferType.Commodity,
-                        UrlName = data.Id.ToString()
-                    };
-                }).ToList();
-
-            return new UpcomingOffersData { Items = items };
+                    Title = data.CommodityName,
+                    Subtitle = data.SupplierName,
+                    DayOfWeek = GetPersianDayOfWeek(offerDate.DayOfWeek),
+                    DayOfMonth = pc.GetDayOfMonth(offerDate).ToString("D2"),
+                    OfferDateType = dateType,
+                    Type = UpcomingOfferType.Commodity,
+                    UrlName = data.Id.ToString() // Using Offer ID for unique URL
+                };
+            }).ToList();
         }
+       
         private string GetPersianDayOfWeek(DayOfWeek dayOfWeek)
         {
             return dayOfWeek switch

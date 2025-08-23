@@ -32,18 +32,11 @@ namespace IME.SpotDataApi.Controllers
             var data = await _subGroupService.GetCommodityActivitiesAsync(subGroupId);
             return Ok(data);
         }
-        [HttpGet("{subGroupId}/upcoming-offers")]
+        [HttpGet("{subGroupId}/offer-history")]
         [ProducesResponseType(typeof(UpcomingOffersData), 200)]
-        public async Task<IActionResult> GetUpcomingOffers(int subGroupId)
+        public async Task<IActionResult> GetOfferHistory(int subGroupId)
         {
-            var data = await _subGroupService.GetUpcomingOffersAsync(subGroupId);
-            return Ok(data);
-        }
-        [HttpGet("{subGroupId}/today-offers")]
-        [ProducesResponseType(typeof(UpcomingOffersData), 200)]
-        public async Task<IActionResult> GetTodayOffers(int subGroupId)
-        {
-            var data = await _subGroupService.GetTodayOffersAsync(subGroupId);
+            var data = await _subGroupService.GetOfferHistoryAsync(subGroupId);
             return Ok(data);
         }
     }
