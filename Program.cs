@@ -14,6 +14,7 @@ using IME.SpotDataApi.Services.MainGroupLevel;
 using IME.SpotDataApi.Services.Markets;
 using IME.SpotDataApi.Services.OfferDetails;
 using IME.SpotDataApi.Services.RemoteData;
+using IME.SpotDataApi.Services.Search;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,6 +45,7 @@ builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<ISubGroupService, SubGroupService>();
 builder.Services.AddScoped<IOfferDetailsService, OfferDetailsService>();
 builder.Services.AddScoped<ICommodityService, CommodityService>();
+builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
