@@ -1,5 +1,9 @@
-﻿using IME.SpotDataApi.Interfaces;
+﻿// File: IME.SpotDataApi/Services/RemoteData/OperationalResurceService.cs
+
+using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.Configuration;
 using IME.SpotDataApi.Models.General;
+using IME.SpotDataApi.Models.Spot; // <-- افزوده شد
 using IME.SpotDataApi.Services.Authenticate;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
@@ -14,6 +18,18 @@ namespace IME.SpotDataApi.Services.RemoteData
         private readonly IDateHelper _dateHelper;
         private readonly JsonSerializerOptions _jsonOptions;
         public string EndPointPath { get; set; }
+
+        // --- بخش مدیریت Rate Limiting ---
+        // برای Offer: حداکثر 20 درخواست در دقیقه
+        private static readonly object _offerRateLock = new object();
+        private static int _offerRequestCount = 0;
+        private static DateTime _offerWindowStart = DateTime.UtcNow;
+
+        // برای TradeReport: حداکثر 20 درخواست در ساعت
+        private static readonly object _tradeReportRateLock = new object();
+        private static int _tradeReportRequestCount = 0;
+        private static DateTime _tradeReportWindowStart = DateTime.UtcNow;
+        // --- پایان بخش Rate Limiting ---
 
         public OperationalResurceService(
             ITokenManager tokenManager,
@@ -53,12 +69,8 @@ namespace IME.SpotDataApi.Services.RemoteData
             return allResults;
         }
 
-        private static readonly Random _random = new Random();
         private async Task<IEnumerable<T>> RetrieveDataFromRemoteApiAsync(DateTime date)
         {
-            var stoppingToken  = new CancellationToken();
-            int delayInSeconds = _random.Next(3, 5);
-            await Task.Delay(TimeSpan.FromMinutes(delayInSeconds), stoppingToken);
             var persianDate = _dateHelper.GetPersianYYYYMMDD(date);
             var requestUrl = $"{EndPointPath}?persianDate={persianDate}&pageNumber=1&pageSize=1000&Language=fa";
             var items = new List<T>();
@@ -73,6 +85,9 @@ namespace IME.SpotDataApi.Services.RemoteData
 
             do
             {
+                // اعمال قوانین محدودیت درخواست قبل از هر فراخوانی
+                await ApplyRateLimitingAsync();
+
                 var response = await _httpClient.GetAsync(requestUrl);
                 response.EnsureSuccessStatusCode();
 
@@ -87,6 +102,59 @@ namespace IME.SpotDataApi.Services.RemoteData
             } while (!string.IsNullOrEmpty(requestUrl));
 
             return items;
+        }
+
+        private async Task ApplyRateLimitingAsync()
+        {
+            TimeSpan delay = TimeSpan.Zero;
+
+            // قانون برای Offer: 20 درخواست در دقیقه
+            if (typeof(T) == typeof(Offer))
+            {
+                lock (_offerRateLock)
+                {
+                    var now = DateTime.UtcNow;
+                    if ((now - _offerWindowStart).TotalMinutes >= 1)
+                    {
+                        _offerWindowStart = now;
+                        _offerRequestCount = 0;
+                    }
+
+                    if (_offerRequestCount >= 20)
+                    {
+                        delay = _offerWindowStart.AddMinutes(1) - now;
+                        _offerWindowStart = _offerWindowStart.AddMinutes(1); // تنظیم پنجره بعدی
+                        _offerRequestCount = 0;
+                    }
+                    _offerRequestCount++;
+                }
+            }
+            // قانون برای TradeReport: 20 درخواست در ساعت
+            else if (typeof(T) == typeof(TradeReport))
+            {
+                lock (_tradeReportRateLock)
+                {
+                    var now = DateTime.UtcNow;
+                    if ((now - _tradeReportWindowStart).TotalHours >= 1)
+                    {
+                        _tradeReportWindowStart = now;
+                        _tradeReportRequestCount = 0;
+                    }
+
+                    if (_tradeReportRequestCount >= 20)
+                    {
+                        delay = _tradeReportWindowStart.AddHours(1) - now;
+                        _tradeReportWindowStart = _tradeReportWindowStart.AddHours(1); // تنظیم پنجره بعدی
+                        _tradeReportRequestCount = 0;
+                    }
+                    _tradeReportRequestCount++;
+                }
+            }
+
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay);
+            }
         }
     }
 }

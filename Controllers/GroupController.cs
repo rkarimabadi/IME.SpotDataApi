@@ -45,5 +45,20 @@ namespace IME.SpotDataApi.Controllers
             var data = await _groupService.GetTodayOffersAsync(groupId);
             return Ok(data);
         }
+        [HttpGet("{groupId}/header")]
+        [ProducesResponseType(typeof(GroupHeaderData), 200)]
+        public async Task<IActionResult> GetHeader(int groupId)
+        {
+            var data = await _groupService.GetGroupHeaderDataAsync(groupId);
+            return Ok(data);
+        }
+
+        [HttpGet("{groupId}/hierarchy")]
+        [ProducesResponseType(typeof(List<HierarchyItem>), 200)]
+        public async Task<IActionResult> GetHierarchy(int groupId)
+        {
+            var data = await _groupService.GetGroupHierarchyAsync(groupId);
+            return Ok(data);
+        }
     }
 }

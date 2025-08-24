@@ -21,6 +21,70 @@ namespace IME.SpotDataApi.Services.MainGroupLevel
             _contextFactory = contextFactory;
             _dateHelper = dateHelper;
         }
+        #region GroupHeader and GroupHierarchy
+        /// <summary>
+        /// اطلاعات هدر یک گروه کالا را واکشی می‌کند.
+        /// </summary>
+        public async Task<GroupHeaderData> GetGroupHeaderDataAsync(int groupId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+
+            var headerInfo = await (from _group in context.Groups.Where(g => g.Id == groupId)
+                                    join mainGroup in context.MainGroups on _group.ParentId equals mainGroup.Id
+                                    select new
+                                    {
+                                        GroupName = _group.PersianName,
+                                        MainGroupId = mainGroup.Id
+                                    })
+                                    .FirstOrDefaultAsync();
+
+            return new GroupHeaderData
+            {
+                GroupName = headerInfo.GroupName,
+                IconCssClass = GetIconForMainGroup(headerInfo.MainGroupId)
+            };
+        }
+
+        /// <summary>
+        /// ساختار سلسله مراتبی یک زیرگروه کالا را ایجاد می‌کند.
+        /// </summary>
+        public async Task<List<HierarchyItem>> GetGroupHierarchyAsync(int groupId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var hierarchy = new List<HierarchyItem>();
+
+            var queryResult = await (from _group in context.Groups.Where(g => g.Id == groupId)
+                                     join mainGroup in context.MainGroups on _group.ParentId equals mainGroup.Id
+                                     select new
+                                     {
+                                         Group = new { _group.Id, _group.PersianName },
+                                         MainGroup = new { mainGroup.Id, mainGroup.PersianName }
+                                     }).FirstOrDefaultAsync();
+
+            if (queryResult != null)
+            {
+                hierarchy.Add(new HierarchyItem { Id = queryResult.MainGroup.Id, Type = "MainGroup", Name = queryResult.MainGroup.PersianName, IsActive = true });
+                hierarchy.Add(new HierarchyItem { Id = queryResult.Group.Id, Type = "Group", Name = queryResult.Group.PersianName, IsActive = false });
+            }
+
+            return hierarchy;
+        }
+
+        private string GetIconForMainGroup(int mainGroupId)
+        {
+            return mainGroupId switch
+            {
+                1 => "bi bi-building",         // صنعتی
+                2 => "bi bi-tree-fill",        // کشاورزی
+                3 => "bi bi-droplet-fill",     // پتروشیمی
+                4 => "bi bi-gem",              // معدنی
+                5 => "bi bi-fuel-pump-fill",   // فرآورده های نفتی
+                6 => "bi bi-house-door-fill",  // اموال غیر منقول
+                7 => "bi bi-shop",             // بازار فرعی
+                _ => "bi bi-box"               // آیکون پیش‌فرض
+            };
+        }
+        #endregion
 
         #region ActiveGroups
         public async Task<GroupListData> GetActiveSubGroupsAsync(int groupId)

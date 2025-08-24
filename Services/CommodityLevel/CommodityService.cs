@@ -533,7 +533,9 @@ namespace IME.SpotDataApi.Services.CommodityLevel
                                   {
                                       o.OfferVol,
                                       SupplierName = s.PersianName,
-                                      BrokerName = b.PersianName
+                                      BrokerName = b.PersianName,
+                                      o.SupplierId,
+                                      o.BrokerId
                                   };
 
             var offersData = await offersDataQuery.ToListAsync();
@@ -543,16 +545,16 @@ namespace IME.SpotDataApi.Services.CommodityLevel
             // 1. شناسایی برترین عرضه‌کننده بر اساس مجموع حجم عرضه
             var totalVolume = offersData.Sum(o => o.OfferVol);
             var topSupplier = offersData
-                .GroupBy(o => o.SupplierName)
-                .Select(g => new { Name = g.Key, Volume = g.Sum(o => o.OfferVol) })
+                .GroupBy(o => (o.SupplierName, o.SupplierId))
+                .Select(g => new {Id = g.Key.SupplierId , Name = g.Key.SupplierName, Volume = g.Sum(o => o.OfferVol) })
                 .OrderByDescending(x => x.Volume)
                 .FirstOrDefault();
 
             // 2. شناسایی برترین کارگزار بر اساس تعداد عرضه
             var totalOfferCount = offersData.Count;
             var topBroker = offersData
-                .GroupBy(o => o.BrokerName)
-                .Select(g => new { Name = g.Key, Count = g.Count() })
+                .GroupBy(o => (o.BrokerName, o.BrokerId))
+                .Select(g => new {Id = g.Key.BrokerId, Name = g.Key.BrokerName, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .FirstOrDefault();
 
@@ -561,7 +563,8 @@ namespace IME.SpotDataApi.Services.CommodityLevel
             {
                 players.Add(new MainPlayer
                 {
-                    Type = "برترین عرضه‌کننده",
+                    Type = MainPlayerType.Supplier,
+                    Id = topSupplier.Id,
                     Name = topSupplier.Name,
                     IconCssClass = "bi bi-buildings-fill",
                     MarketShare = (decimal)(topSupplier.Volume / totalVolume) * 100
@@ -571,7 +574,8 @@ namespace IME.SpotDataApi.Services.CommodityLevel
             {
                 players.Add(new MainPlayer
                 {
-                    Type = "فعال‌ترین کارگزار",
+                    Type = MainPlayerType.Broker,
+                    Id = topBroker.Id,
                     Name = topBroker.Name,
                     IconCssClass = "bi bi-person-workspace",
                     MarketShare = ((decimal)topBroker.Count / totalOfferCount) * 100
@@ -790,11 +794,11 @@ namespace IME.SpotDataApi.Services.CommodityLevel
             return dayOfWeek switch
             {
                 DayOfWeek.Saturday => "شنبه",
-                DayOfWeek.Sunday => "یک",
-                DayOfWeek.Monday => "دو",
-                DayOfWeek.Tuesday => "سه",
-                DayOfWeek.Wednesday => "چهار",
-                DayOfWeek.Thursday => "پنج",
+                DayOfWeek.Sunday => "یکشنبه",
+                DayOfWeek.Monday => "دوشنبه",
+                DayOfWeek.Tuesday => "سه‌شنبه",
+                DayOfWeek.Wednesday => "چهارشنبه",
+                DayOfWeek.Thursday => "پنجشنبه",
                 DayOfWeek.Friday => "جمعه",
                 _ => ""
             };

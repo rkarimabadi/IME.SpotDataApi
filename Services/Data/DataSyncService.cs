@@ -1,7 +1,9 @@
 ﻿using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.Configuration;
 using IME.SpotDataApi.Models.Notification;
 using IME.SpotDataApi.Models.Public;
 using IME.SpotDataApi.Models.Spot;
+using Microsoft.Extensions.Options;
 
 namespace IME.SpotDataApi.Services.Data
 {
@@ -10,18 +12,20 @@ namespace IME.SpotDataApi.Services.Data
         private const string version = "v2";
         private readonly ILogger<DataSyncService> _logger;
         private readonly IServiceProvider _serviceProvider;
-        // کل چرخه همگام‌سازی هر یک ساعت یکبار اجرا می‌شود تا محدودیت نرخ رعایت شود
-        private readonly TimeSpan _cycleDelay = TimeSpan.FromMinutes(15);
+        private readonly DataSyncSettings _settings;
+        private readonly TimeSpan _cycleDelay;
 
-        public DataSyncService(ILogger<DataSyncService> logger, IServiceProvider serviceProvider)
+        public DataSyncService(ILogger<DataSyncService> logger, IServiceProvider serviceProvider, IOptions<DataSyncSettings> settings)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
+            _settings = settings.Value; // نگهداری تنظیمات
+            _cycleDelay = TimeSpan.FromMinutes(_settings.CycleDelayMinutes); // خواندن از تنظیمات
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("سرویس همگام‌سازی داده‌ها (نسخه موازی) شروع به کار کرد.");
+            _logger.LogInformation("سرویس همگام‌سازی داده‌ها (نسخه موازی و قابل تنظیم) شروع به کار کرد.");
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -29,42 +33,39 @@ namespace IME.SpotDataApi.Services.Data
 
                 try
                 {
-                    await SyncBasicInformation<Broker>($"/{version}/spot/Brokers", stoppingToken);
-                    await SyncBasicInformation<BuyMethod>($"/{version}/spot/BuyMethods", stoppingToken);
-                    await SyncBasicInformation<Commodity>($"/{version}/spot/Commodities", stoppingToken);
-                    await SyncBasicInformation<Group>($"/{version}/spot/Groups", stoppingToken);
-                    await SyncBasicInformation<SubGroup>($"/{version}/spot/SubGroups", stoppingToken);
-                    await SyncBasicInformation<MainGroup>($"/{version}/spot/MainGroups", stoppingToken);
-                    await SyncBasicInformation<OfferMode>($"/{version}/spot/OfferModes", stoppingToken);
-                    await SyncBasicInformation<PackagingType>($"/{version}/spot/PackagingTypes", stoppingToken);
-                    await SyncBasicInformation<SettlementType>($"/{version}/spot/SettlementTypes", stoppingToken);
-                    await SyncBasicInformation<SecurityType>($"/{version}/spot/SecurityTypes", stoppingToken);
-                    await SyncBasicInformation<OfferType>($"/{version}/spot/OfferTypes", stoppingToken);
-                    await SyncBasicInformation<Manufacturer>($"/{version}/spot/Manufacturers", stoppingToken);
-                    await SyncBasicInformation<Supplier>($"/{version}/spot/Suppliers", stoppingToken);
-                    await SyncBasicInformation<MeasurementUnit>($"/{version}/spot/MeasurementUnits", stoppingToken);
-                    await SyncBasicInformation<CurrencyUnit>($"/{version}/spot/CurrencyUnits", stoppingToken);
-                    await SyncBasicInformation<ContractType>($"/{version}/spot/ContractTypes", stoppingToken);
-                    await SyncBasicInformation<DeliveryPlace>($"/{version}/spot/DeliveryPlaces", stoppingToken);
-                    await SyncBasicInformation<TradingHall>($"/{version}/spot/TradingHalls", stoppingToken);
-                    await SyncBasicInformation<Tender>($"/{version}/spot/Tenders", stoppingToken);
+                    // فراخوانی‌ها به متدهای Helper که تنظیمات را چک می‌کنند، تغییر یافت
+                    await TrySyncBasicAsync<Broker>($"/{version}/spot/Brokers", stoppingToken);
+                    await TrySyncBasicAsync<BuyMethod>($"/{version}/spot/BuyMethods", stoppingToken);
+                    await TrySyncBasicAsync<Commodity>($"/{version}/spot/Commodities", stoppingToken);
+                    await TrySyncBasicAsync<Group>($"/{version}/spot/Groups", stoppingToken);
+                    await TrySyncBasicAsync<SubGroup>($"/{version}/spot/SubGroups", stoppingToken);
+                    await TrySyncBasicAsync<MainGroup>($"/{version}/spot/MainGroups", stoppingToken);
+                    await TrySyncBasicAsync<OfferMode>($"/{version}/spot/OfferModes", stoppingToken);
+                    await TrySyncBasicAsync<PackagingType>($"/{version}/spot/PackagingTypes", stoppingToken);
+                    await TrySyncBasicAsync<SettlementType>($"/{version}/spot/SettlementTypes", stoppingToken);
+                    await TrySyncBasicAsync<SecurityType>($"/{version}/spot/SecurityTypes", stoppingToken);
+                    await TrySyncBasicAsync<OfferType>($"/{version}/spot/OfferTypes", stoppingToken);
+                    await TrySyncBasicAsync<Manufacturer>($"/{version}/spot/Manufacturers", stoppingToken);
+                    await TrySyncBasicAsync<Supplier>($"/{version}/spot/Suppliers", stoppingToken);
+                    await TrySyncBasicAsync<MeasurementUnit>($"/{version}/spot/MeasurementUnits", stoppingToken);
+                    await TrySyncBasicAsync<CurrencyUnit>($"/{version}/spot/CurrencyUnits", stoppingToken);
+                    await TrySyncBasicAsync<ContractType>($"/{version}/spot/ContractTypes", stoppingToken);
+                    await TrySyncBasicAsync<DeliveryPlace>($"/{version}/spot/DeliveryPlaces", stoppingToken);
+                    await TrySyncBasicAsync<TradingHall>($"/{version}/spot/TradingHalls", stoppingToken);
+                    await TrySyncBasicAsync<Tender>($"/{version}/spot/Tenders", stoppingToken);
 
-
-                    await SyncOperationalResource<Offer>($"/{version}/spot/Offers", DateTime.Now.AddDays(-7), DateTime.Now.AddDays(25), stoppingToken);
-                    await SyncOperationalResource<TradeReport>($"/{version}/spot/reports/Trades", DateTime.Now.AddDays(-5), DateTime.Now, stoppingToken);
-                    await SyncOperationalResource<NewsNotification>("api/Notifications/NewsNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
-                    await SyncOperationalResource<SpotNotification>("/api/Notifications/SpotNotificationsByDate", DateTime.Now.AddYears(-1), DateTime.Now, stoppingToken);
-
+                    await TrySyncOperationalAsync<Offer>($"/{version}/spot/Offers", stoppingToken);
+                    await TrySyncOperationalAsync<TradeReport>($"/{version}/spot/reports/Trades", stoppingToken);
+                    await TrySyncOperationalAsync<NewsNotification>("api/Notifications/NewsNotificationsByDate", stoppingToken);
+                    await TrySyncOperationalAsync<SpotNotification>("/api/Notifications/SpotNotificationsByDate", stoppingToken);
 
                     _logger.LogInformation("چرخه همگام‌سازی موازی با موفقیت به پایان رسید.");
                 }
                 catch (Exception ex)
                 {
-                    // Task.WhenAll اولین خطایی که رخ دهد را برمی‌گرداند
                     _logger.LogError(ex, "خطا در حین اجرای چرخه همگام‌سازی موازی.");
                 }
 
-                // انتظار برای شروع چرخه بعدی
                 _logger.LogInformation("در حال انتظار برای شروع چرخه بعدی همگام‌سازی...");
                 await Task.Delay(_cycleDelay, stoppingToken);
             }
@@ -72,53 +73,76 @@ namespace IME.SpotDataApi.Services.Data
             _logger.LogInformation("سرویس همگام‌سازی داده‌ها متوقف شد.");
         }
 
+        // متد Helper جدید برای اطلاعات پایه
+        private async Task TrySyncBasicAsync<T>(string endpoint, CancellationToken token) where T : RootObj<int>
+        {
+            var entityName = typeof(T).Name;
+            if (_settings.BasicInformation.TryGetValue(entityName, out bool isEnabled) && isEnabled)
+            {
+                await SyncBasicInformation<T>(endpoint, token);
+            }
+            else
+            {
+                _logger.LogDebug("همگام‌سازی برای {EntityName} در تنظیمات غیرفعال است.", entityName);
+            }
+        }
+
+        // متد Helper جدید برای منابع عملیاتی
+        private async Task TrySyncOperationalAsync<T>(string endpoint, CancellationToken token) where T : RootObj<int>
+        {
+            var entityName = typeof(T).Name;
+            if (_settings.OperationalResources.TryGetValue(entityName, out var resourceSettings) && resourceSettings.IsEnabled)
+            {
+                var fromDate = DateTime.Now.AddDays(resourceSettings.FromDateDaysOffset);
+                var toDate = DateTime.Now.AddDays(resourceSettings.ToDateDaysOffset);
+                await SyncOperationalResource<T>(endpoint, fromDate, toDate, token);
+            }
+            else
+            {
+                _logger.LogDebug("همگام‌سازی برای {EntityName} در تنظیمات غیرفعال است.", entityName);
+            }
+        }
+
         private async Task SyncBasicInformation<T>(string endpointPath, CancellationToken stoppingToken) where T : RootObj<int>
         {
+            // بدون تغییر
             if (stoppingToken.IsCancellationRequested) return;
-
-            _logger.LogInformation("شروع همگام‌سازی موازی برای: {EntityName}", typeof(T).Name);
+            _logger.LogInformation("شروع همگام‌سازی برای: {EntityName}", typeof(T).Name);
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var remoteService = scope.ServiceProvider.GetRequiredService<IRemotePublicResurceService<T>>();
                 var repository = scope.ServiceProvider.GetRequiredService<IDataRepository<T>>();
-
                 remoteService.EndPointPath = endpointPath;
                 var items = await remoteService.RetrieveResurcesDataAsync();
                 await repository.UpsertAsync(items);
-
-                _logger.LogInformation("همگام‌سازی موازی برای {EntityName} با موفقیت انجام شد. تعداد رکوردها: {Count}", typeof(T).Name, items.Count());
+                _logger.LogInformation("همگام‌سازی برای {EntityName} با موفقیت انجام شد. تعداد رکوردها: {Count}", typeof(T).Name, items.Count());
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "خطا در هنگام همگام‌سازی {EntityName}", typeof(T).Name);
-                // خطا را دوباره پرتاب می‌کنیم تا Task.WhenAll آن را دریافت کند
                 throw;
             }
         }
 
         private async Task SyncOperationalResource<T>(string endpointPath, DateTime fromDate, DateTime toDate, CancellationToken stoppingToken) where T : RootObj<int>
         {
+            // بدون تغییر
             if (stoppingToken.IsCancellationRequested) return;
-
-            _logger.LogInformation("شروع همگام‌سازی موازی برای: {EntityName}", typeof(T).Name);
-
+            _logger.LogInformation("شروع همگام‌سازی برای: {EntityName} از {FromDate} تا {ToDate}", typeof(T).Name, fromDate, toDate);
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var remoteService = scope.ServiceProvider.GetRequiredService<IRemoreOperationalResurceService<T>>();
                 var repository = scope.ServiceProvider.GetRequiredService<IDataRepository<T>>();
-
                 remoteService.EndPointPath = endpointPath;
                 var items = await remoteService.RetrieveAsync(fromDate, toDate);
                 await repository.UpsertAsync(items);
-
-                _logger.LogInformation("همگام‌سازی موازی برای {EntityName} با موفقیت انجام شد. تعداد رکوردها: {Count}", typeof(T).Name, items.Count());
+                _logger.LogInformation("همگام‌سازی برای {EntityName} با موفقیت انجام شد. تعداد رکوردها: {Count}", typeof(T).Name, items.Count());
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "خطا در هنگام همگام‌سازی {EntityName}", typeof(T).Name);
-                // خطا را دوباره پرتاب می‌کنیم تا Task.WhenAll آن را دریافت کند
                 throw;
             }
         }

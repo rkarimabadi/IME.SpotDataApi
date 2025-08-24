@@ -1,4 +1,5 @@
 ﻿using IME.SpotDataApi.Interfaces;
+using IME.SpotDataApi.Models.Configuration;
 using IME.SpotDataApi.Models.General;
 using IME.SpotDataApi.Services.Authenticate;
 using Microsoft.Extensions.Options;

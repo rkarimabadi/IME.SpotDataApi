@@ -1,6 +1,7 @@
 ﻿using IME.SpotDataApi.Data;
 using IME.SpotDataApi.Interfaces;
 using IME.SpotDataApi.Models.Presentation;
+using IME.SpotDataApi.Models.Spot;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 
@@ -20,6 +21,76 @@ namespace IME.SpotDataApi.Services.MainGroupLevel
             _contextFactory = contextFactory;
             _dateHelper = dateHelper;
         }
+        #region SubGroupHeader and SubGroupHierarchy
+        /// <summary>
+        /// اطلاعات هدر یک زیرگروه کالا را واکشی می‌کند.
+        /// </summary>
+        public async Task<SubGroupHeaderData> GetSubGroupHeaderDataAsync(int subGroupId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+
+            var headerInfo = await (from subGroup in context.SubGroups.Where(sg => sg.Id == subGroupId)
+                                    join grp in context.Groups on subGroup.ParentId equals grp.Id
+                                    join mainGroup in context.MainGroups on grp.ParentId equals mainGroup.Id
+                                    select new
+                                    {
+                                        SubGroupName = subGroup.PersianName,
+                                        GroupName = grp.PersianName,
+                                        MainGroupId = mainGroup.Id
+                                    })
+                                    .FirstOrDefaultAsync();
+
+            return new SubGroupHeaderData
+            {
+                SubGroupName = headerInfo.SubGroupName,
+                GroupName = headerInfo.GroupName,
+                IconCssClass = GetIconForMainGroup(headerInfo.MainGroupId)
+            };
+        }
+
+        /// <summary>
+        /// ساختار سلسله مراتبی یک زیرگروه کالا را ایجاد می‌کند.
+        /// </summary>
+        public async Task<List<HierarchyItem>> GetSubGroupHierarchyAsync(int subGroupId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var hierarchy = new List<HierarchyItem>();
+
+            var queryResult = await (from subGroup in context.SubGroups.Where(sg => sg.Id == subGroupId)
+                                     join grp in context.Groups on subGroup.ParentId equals grp.Id
+                                     join mainGroup in context.MainGroups on grp.ParentId equals mainGroup.Id
+                                     select new
+                                     {
+                                         SubGroup = new { subGroup.Id, subGroup.PersianName },
+                                         Group = new { grp.Id, grp.PersianName },
+                                         MainGroup = new { mainGroup.Id, mainGroup.PersianName }
+                                     }).FirstOrDefaultAsync();
+
+            if (queryResult != null)
+            {
+                hierarchy.Add(new HierarchyItem { Id = queryResult.MainGroup.Id, Type = "MainGroup", Name = queryResult.MainGroup.PersianName, IsActive = true });
+                hierarchy.Add(new HierarchyItem { Id = queryResult.Group.Id, Type = "Group", Name = queryResult.Group.PersianName, IsActive = true });
+                hierarchy.Add(new HierarchyItem { Id = queryResult.SubGroup.Id, Type = "SubGroup", Name = queryResult.SubGroup.PersianName, IsActive = false });
+            }
+
+            return hierarchy;
+        }
+
+        private string GetIconForMainGroup(int mainGroupId)
+        {
+            return mainGroupId switch
+            {
+                1 => "bi bi-building",         // صنعتی
+                2 => "bi bi-tree-fill",        // کشاورزی
+                3 => "bi bi-droplet-fill",     // پتروشیمی
+                4 => "bi bi-gem",              // معدنی
+                5 => "bi bi-fuel-pump-fill",   // فرآورده های نفتی
+                6 => "bi bi-house-door-fill",  // اموال غیر منقول
+                7 => "bi bi-shop",             // بازار فرعی
+                _ => "bi bi-box"               // آیکون پیش‌فرض
+            };
+        }
+        #endregion
 
         #region ActiveCommodities
         public async Task<GroupListData> GetActiveCommoditiesAsync(int subGroupId)

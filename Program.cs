@@ -1,11 +1,11 @@
 using IME.SpotDataApi.Data;
 using IME.SpotDataApi.Helpers;
 using IME.SpotDataApi.Interfaces;
-using IME.SpotDataApi.Models.Authenticate;
-using IME.SpotDataApi.Models.General;
+using IME.SpotDataApi.Models.Configuration;
 using IME.SpotDataApi.Models.Notification;
 using IME.SpotDataApi.Repository;
 using IME.SpotDataApi.Services.Authenticate;
+using IME.SpotDataApi.Services.BrokerLevel;
 using IME.SpotDataApi.Services.CommodityLevel;
 using IME.SpotDataApi.Services.Dashboard;
 using IME.SpotDataApi.Services.Data;
@@ -46,16 +46,20 @@ builder.Services.AddScoped<ISubGroupService, SubGroupService>();
 builder.Services.AddScoped<IOfferDetailsService, OfferDetailsService>();
 builder.Services.AddScoped<ICommodityService, CommodityService>();
 builder.Services.AddScoped<ISearchService, SearchService>();
+builder.Services.AddScoped<IBrokerService, BrokerService>();
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContextFactory<AppDataContext>(options =>
-    options.UseSqlite(connectionString),
+    options.UseSqlServer(connectionString),
     ServiceLifetime.Singleton
 );
 
+builder.Services.Configure<DataSyncSettings>(
+    builder.Configuration.GetSection(DataSyncSettings.SectionName)
+);
 builder.Services.Configure<SsoSettings>(
     builder.Configuration.GetSection(SsoSettings.SectionName)
 );

@@ -427,11 +427,11 @@ namespace IME.SpotDataApi.Services.Dashboard
             {
                 var topSupplierName = await context.Suppliers
                     .Where(s => s.Id == topSupplierData.Id)
-                    .Select(s => s.PersianName)
-                    .FirstOrDefaultAsync() ?? "نامشخص";
+                    .Select(s => new { s.Id, s.PersianName })
+                    .FirstOrDefaultAsync();
                 mainPlayers.Add(new MainPlayer
                 {
-                    Type = "برترین عرضه‌کننده", Name = topSupplierName, IconCssClass = "bi bi-buildings-fill",
+                    Type = MainPlayerType.Supplier, Id = topSupplierName?.Id ?? 0,  Name = topSupplierName?.PersianName ?? "نامشخص", IconCssClass = "bi bi-buildings-fill",
                     MarketShare = (topSupplierData.TotalValue / totalMarketValue) * 100
                 });
             }
@@ -440,11 +440,11 @@ namespace IME.SpotDataApi.Services.Dashboard
             {
                 var topBrokerName = await context.Brokers
                     .Where(b => b.Id == topBrokerData.Id)
-                    .Select(b => b.PersianName)
-                    .FirstOrDefaultAsync() ?? "نامشخص";
+                    .Select(b => new { b.Id, b.PersianName })
+                    .FirstOrDefaultAsync();
                 mainPlayers.Add(new MainPlayer
                 {
-                    Type = "برترین کارگزار", Name = topBrokerName, IconCssClass = "bi bi-person-workspace",
+                    Type = MainPlayerType.Broker, Id = topBrokerName?.Id ?? 0, Name = topBrokerName?.PersianName ?? "نامشخص", IconCssClass = "bi bi-person-workspace",
                     MarketShare = (topBrokerData.TotalValue / totalMarketValue) * 100
                 });
             }

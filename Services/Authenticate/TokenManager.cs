@@ -1,5 +1,5 @@
 ﻿using IdentityModel.Client;
-using IME.SpotDataApi.Models.Authenticate;
+using IME.SpotDataApi.Models.Configuration;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 

@@ -1,5 +1,5 @@
 ﻿using IME.SpotDataApi.Interfaces;
-using IME.SpotDataApi.Models.General;
+using IME.SpotDataApi.Models.Configuration;
 using IME.SpotDataApi.Models.Notification;
 using Microsoft.Extensions.Options;
 using System.Globalization;

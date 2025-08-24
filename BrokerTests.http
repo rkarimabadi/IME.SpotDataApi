@@ -1,0 +1,66 @@
+﻿# File: IME.SpotDataApi/BrokerTests.http
+
+# متغیرها: لطفاً آدرس و پورت پروژه در حال اجرای خود را جایگزین کنید
+@apiHost = https://localhost:7157
+@brokerId = 38
+@acceptJson = application/json
+
+###
+# 1. دریافت اطلاعات هدر کارگزار
+# @name GetBrokerHeader
+GET {{apiHost}}/api/Broker/{{brokerId}}/header
+Accept: {{acceptJson}}
+
+###
+# 2. دریافت نسبت رقابت (قدرت فروش)
+# @name GetCompetitionRatio
+GET {{apiHost}}/api/Broker/{{brokerId}}/competition-ratio
+Accept: {{acceptJson}}
+
+###
+# 3. دریافت نرخ موفقیت در عرضه‌ها
+# @name GetSuccessRate
+GET {{apiHost}}/api/Broker/{{brokerId}}/success-rate
+Accept: {{acceptJson}}
+
+###
+# 4. دریافت سهم از بازار (ارزشی و حجمی)
+# @name GetMarketShare
+GET {{apiHost}}/api/Broker/{{brokerId}}/market-share
+Accept: {{acceptJson}}
+
+###
+# 5. دریافت رتبه در بازار
+# @name GetRanking
+GET {{apiHost}}/api/Broker/{{brokerId}}/ranking
+Accept: {{acceptJson}}
+
+###
+# 6. دریافت سهم از عملکرد در گروه‌های کالایی
+# @name GetCommodityGroupShare
+GET {{apiHost}}/api/Broker/{{brokerId}}/commodity-group-share
+Accept: {{acceptJson}}
+
+###
+# 7. دریافت اطلاعیه عرضه‌ها (گذشته، امروز، آینده)
+# @name GetBrokerOffers
+GET {{apiHost}}/api/Broker/{{brokerId}}/offers
+Accept: {{acceptJson}}
+
+###
+# 8. دریافت برترین عرضه‌کنندگان برای این کارگزار
+# @name GetTopSuppliers
+GET {{apiHost}}/api/Broker/{{brokerId}}/top-suppliers
+Accept: {{acceptJson}}
+
+###
+# 9. دریافت لیست تمام عرضه‌کنندگان
+# @name GetAllSuppliers
+GET {{apiHost}}/api/Broker/{{brokerId}}/all-suppliers
+Accept: {{acceptJson}}
+
+###
+# 10. دریافت عملکرد در کالاهای استراتژیک
+# @name GetStrategicPerformance
+GET {{apiHost}}/api/Broker/{{brokerId}}/strategic-performance
+Accept: {{acceptJson}}
