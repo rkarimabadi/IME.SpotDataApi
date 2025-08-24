@@ -1,6 +1,4 @@
-﻿// File: IME.SpotDataApi/Services/RemoteData/OperationalResurceService.cs
-
-using IME.SpotDataApi.Interfaces;
+﻿using IME.SpotDataApi.Interfaces;
 using IME.SpotDataApi.Models.Configuration;
 using IME.SpotDataApi.Models.General;
 using IME.SpotDataApi.Models.Spot; // <-- افزوده شد
