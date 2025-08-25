@@ -47,6 +47,7 @@ namespace IME.SpotDataApi.Controllers
         }
         [HttpGet("{groupId}/header")]
         [ProducesResponseType(typeof(GroupHeaderData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetHeader(int groupId)
         {
             var data = await _groupService.GetGroupHeaderDataAsync(groupId);
@@ -55,6 +56,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("{groupId}/hierarchy")]
         [ProducesResponseType(typeof(List<HierarchyItem>), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetHierarchy(int groupId)
         {
             var data = await _groupService.GetGroupHierarchyAsync(groupId);

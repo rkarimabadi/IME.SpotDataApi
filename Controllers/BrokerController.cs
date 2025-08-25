@@ -17,6 +17,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("{brokerId:int}/header")]
         [ProducesResponseType(typeof(BrokerHeaderData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetBrokerHeader(int brokerId)
         {
             var data = await _brokerService.GetBrokerHeaderAsync(brokerId);

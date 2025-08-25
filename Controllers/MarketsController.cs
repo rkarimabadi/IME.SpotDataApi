@@ -19,6 +19,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("main-groups")]
         [ProducesResponseType(typeof(List<MarketInfo>), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetMainGroups()
         {
             var data = await _marketsService.GetMainGroupsDataAsync();

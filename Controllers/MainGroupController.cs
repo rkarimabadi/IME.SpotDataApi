@@ -33,6 +33,7 @@ namespace IME.SpotDataApi.Controllers
         }
         [HttpGet("{mainGroupId}/upcoming-offers")]
         [ProducesResponseType(typeof(UpcomingOffersData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetUpcomingOffers(int mainGroupId)
         {
             var data = await _mainGroupService.GetUpcomingOffersAsync(mainGroupId);

@@ -17,6 +17,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("{commodityId}/header")]
         [ProducesResponseType(typeof(CommodityHeaderData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetHeader(int commodityId)
         {
             var data = await _commodityService.GetCommodityHeaderDataAsync(commodityId);

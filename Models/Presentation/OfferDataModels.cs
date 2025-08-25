@@ -31,5 +31,6 @@
         public string SettlementType { get; set; } = string.Empty;
         public string SecurityType { get; set; } = string.Empty;
         public string PackagingType { get; set; } = string.Empty;
+        public int BrokerId { get; set; }
     }
 }

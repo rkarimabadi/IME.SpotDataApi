@@ -1,9 +1,9 @@
 ﻿using IME.SpotDataApi.Data;
 using IME.SpotDataApi.Interfaces;
 using IME.SpotDataApi.Models.Presentation;
-using IME.SpotDataApi.Models.Spot;
-using IME.SpotDataApi.Repository;
+using IME.SpotDataApi.Services.Caching;
 using Microsoft.EntityFrameworkCore;
+using static IME.SpotDataApi.Models.Core.Constants;
 
 namespace IME.SpotDataApi.Services.Dashboard
 {
@@ -26,71 +26,79 @@ namespace IME.SpotDataApi.Services.Dashboard
     public class DashboardService : IDashboardService
     {
         private readonly IDbContextFactory<AppDataContext> _contextFactory;
+        private readonly ICacheService _cacheService;
         private readonly IDateHelper _dateHelper;
 
         public DashboardService(
             IDbContextFactory<AppDataContext> contextFactory,
-            IDateHelper dateHelper)
+            IDateHelper dateHelper,
+            ICacheService cacheService)
         {
             _contextFactory = contextFactory;
             _dateHelper = dateHelper;
+            _cacheService = cacheService;
         }
         #region MarketPulse
         public async Task<MarketPulseData> GetMarketPulseAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            string cacheKey = "Dashboard_MarketPulse";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            // کوئری اول: محاسبه آمار بر اساس تمام عرضه‌های امروز
-            var offerStats = await context.Offers
-                .Where(o => o.OfferDate == todayPersian)
-                .GroupBy(o => 1)
-                .Select(g => new
+                // کوئری اول: محاسبه آمار بر اساس تمام عرضه‌های امروز
+                var offerStats = await context.Offers
+                    .Where(o => o.OfferDate == todayPersian)
+                    .GroupBy(o => 1)
+                    .Select(g => new
+                    {
+                        PotentialValue = g.Sum(o => o.InitPrice * (o.OfferVol * 1000)),
+                        TotalInitialSupply = g.Sum(o => o.OfferVol)
+                    })
+                    .FirstOrDefaultAsync();
+
+                // کوئری دوم: محاسبه آمار بر اساس تمام معاملات امروز
+                var tradeStats = await context.TradeReports
+                    .Where(t => t.TradeDate == todayPersian)
+                    .GroupBy(t => 1)
+                    .Select(g => new
+                    {
+                        RealizedValue = g.Sum(t => t.TradeValue * 1000),
+                        TotalRegisteredDemand = g.Sum(t => t.DemandVolume)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (offerStats == null || tradeStats == null)
                 {
-                    PotentialValue = g.Sum(o => o.InitPrice * (o.OfferVol * 1000)),
-                    TotalInitialSupply = g.Sum(o => o.OfferVol)
-                })
-                .FirstOrDefaultAsync();
+                    //var emptyPulse = new PulseCardItem { ChangeState = ValueState.Neutral };
+                    //return new MarketPulseData { Items = new List<PulseCardItem> { emptyPulse, emptyPulse } };
+                    return new MarketPulseData { Items = new List<PulseCardItem>() };
+                }
 
-            // کوئری دوم: محاسبه آمار بر اساس تمام معاملات امروز
-            var tradeStats = await context.TradeReports
-                .Where(t => t.TradeDate == todayPersian)
-                .GroupBy(t => 1)
-                .Select(g => new
+                var realizationRatio = offerStats.PotentialValue > 0 ? (tradeStats.RealizedValue / offerStats.PotentialValue) * 100 : 0;
+                var demandStrengthRatio = offerStats.TotalInitialSupply > 0 ? tradeStats.TotalRegisteredDemand / offerStats.TotalInitialSupply : 0;
+
+                var realizationItem = new PulseCardItem
                 {
-                    RealizedValue = g.Sum(t => t.TradeValue * 1000),
-                    TotalRegisteredDemand = g.Sum(t => t.DemandVolume)
-                })
-                .FirstOrDefaultAsync();
+                    Title = "پتانسیل بازار",
+                    Value = FormatLargeNumber(tradeStats.RealizedValue),
+                    Change = $"{realizationRatio:F1}%",
+                    ChangeLabel = "نرخ تحقق",
+                    ChangeState = realizationRatio > 50 ? ValueState.Positive : (realizationRatio < 50 && realizationRatio > 0 ? ValueState.Negative : ValueState.Neutral)
+                };
 
-            if (offerStats == null || tradeStats == null)
-            {
-                var emptyPulse = new PulseCardItem { ChangeState = ValueState.Neutral };
-                return new MarketPulseData { Items = new List<PulseCardItem> { emptyPulse, emptyPulse } };
-            }
+                var demandStrengthItem = new PulseCardItem
+                {
+                    Title = "نسبت قدرت تقاضا",
+                    Value = $"{tradeStats.TotalRegisteredDemand:N0} تن",
+                    Change = $"x{demandStrengthRatio:F2}",
+                    ChangeLabel = "ضریب تقاضا",
+                    ChangeState = demandStrengthRatio > 1 ? ValueState.Positive : (demandStrengthRatio < 1 && demandStrengthRatio > 0 ? ValueState.Negative : ValueState.Neutral)
+                };
 
-            var realizationRatio = offerStats.PotentialValue > 0 ? (tradeStats.RealizedValue / offerStats.PotentialValue) * 100 : 0;
-            var demandStrengthRatio = offerStats.TotalInitialSupply > 0 ? tradeStats.TotalRegisteredDemand / offerStats.TotalInitialSupply : 0;
-
-            var realizationItem = new PulseCardItem
-            {
-                Title = "پتانسیل بازار",
-                Value = FormatLargeNumber(tradeStats.RealizedValue),
-                Change = $"{realizationRatio:F1}%",
-                ChangeLabel = "نرخ تحقق",
-                ChangeState = realizationRatio > 50 ? ValueState.Positive : (realizationRatio < 50 && realizationRatio > 0 ? ValueState.Negative : ValueState.Neutral)
-            };
-
-            var demandStrengthItem = new PulseCardItem
-            {
-                Title = "نسبت قدرت تقاضا",
-                Value = $"{tradeStats.TotalRegisteredDemand:N0} تن",
-                Change = $"x{demandStrengthRatio:F2}",
-                ChangeLabel = "ضریب تقاضا",
-                ChangeState = demandStrengthRatio > 1 ? ValueState.Positive : (demandStrengthRatio < 1 && demandStrengthRatio > 0 ? ValueState.Negative : ValueState.Neutral)
-            };
-
-            return new MarketPulseData { Items = new List<PulseCardItem> { realizationItem, demandStrengthItem } };
+                return new MarketPulseData { Items = new List<PulseCardItem> { realizationItem, demandStrengthItem } };
+            }, expirationInMinutes: 15);
         }
 
         private string FormatLargeNumber(decimal valueInRials)
@@ -104,47 +112,51 @@ namespace IME.SpotDataApi.Services.Dashboard
         #region MarketSentiment
         public async Task<MarketSentimentData> GetMarketSentimentAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            string cacheKey = "Dashboard_MarketSentiment";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            // رفع خطا: ابتدا داده‌های خام را از دیتابیس واکشی می‌کنیم
-            var todayOffers = await context.Offers
-                .Where(o => o.OfferDate == todayPersian)
-                .Select(o => new { o.ContractTypeId, o.InitPrice, o.OfferVol })
-                .ToListAsync();
+                // رفع خطا: ابتدا داده‌های خام را از دیتابیس واکشی می‌کنیم
+                var todayOffers = await context.Offers
+                    .Where(o => o.OfferDate == todayPersian)
+                    .Select(o => new { o.ContractTypeId, o.InitPrice, o.OfferVol })
+                    .ToListAsync();
 
-            if (!todayOffers.Any()) return new MarketSentimentData { Items = new List<SentimentItem>() };
-            
-            // سپس گروه‌بندی و محاسبات را در حافظه انجام می‌دهیم
-            var valueByCategory = todayOffers
-                .GroupBy(o => GetContractCategory(o.ContractTypeId))
-                .Select(g => new { Category = g.Key, TotalValue = g.Sum(o => o.InitPrice * o.OfferVol) })
+                if (!todayOffers.Any()) return new MarketSentimentData { Items = new List<SentimentItem>() };
+
+                // سپس گروه‌بندی و محاسبات را در حافظه انجام می‌دهیم
+                var valueByCategory = todayOffers
+                    .GroupBy(o => GetContractCategory(o.ContractTypeId))
+                    .Select(g => new { Category = g.Key, TotalValue = g.Sum(o => o.InitPrice * o.OfferVol) })
+                    .ToList();
+
+                var totalValue = valueByCategory.Sum(c => c.TotalValue);
+                if (totalValue == 0) return new MarketSentimentData { Items = new List<SentimentItem>() };
+
+                var items = valueByCategory.Select(c => new SentimentItem
+                {
+                    Name = c.Category,
+                    Percentage = (int)System.Math.Round((c.TotalValue / totalValue) * 100),
+                    ColorCssVariable = GetCategoryColor(c.Category)
+                })
+                .Where(i => i.Percentage > 0)
+                .OrderByDescending(i => i.Percentage)
                 .ToList();
 
-            var totalValue = valueByCategory.Sum(c => c.TotalValue);
-            if (totalValue == 0) return new MarketSentimentData { Items = new List<SentimentItem>() };
-
-            var items = valueByCategory.Select(c => new SentimentItem
-            {
-                Name = c.Category,
-                Percentage = (int)System.Math.Round((c.TotalValue / totalValue) * 100),
-                ColorCssVariable = GetCategoryColor(c.Category)
-            })
-            .Where(i => i.Percentage > 0)
-            .OrderByDescending(i => i.Percentage)
-            .ToList();
-
-            // Adjust percentages to sum to 100
-            if (items.Any())
-            {
-                var currentSum = items.Sum(i => i.Percentage);
-                if (currentSum != 100)
+                // Adjust percentages to sum to 100
+                if (items.Any())
                 {
-                    items.First().Percentage += (100 - currentSum);
+                    var currentSum = items.Sum(i => i.Percentage);
+                    if (currentSum != 100)
+                    {
+                        items.First().Percentage += (100 - currentSum);
+                    }
                 }
-            }
 
-            return new MarketSentimentData { Items = items };
+                return new MarketSentimentData { Items = items };
+            }, expirationInMinutes: 15);
         }
 
         private string GetContractCategory(int contractTypeId)
@@ -175,55 +187,59 @@ namespace IME.SpotDataApi.Services.Dashboard
         #region MarketExcitement      
         public async Task<MarketExcitementData> GetMarketExcitementAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            string cacheKey = "Dashboard_MarketExcitement";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            // بهینه‌سازی: استفاده از کلاس داخلی به جای نوع داینامیک برای جلوگیری از خطا
-            var excitementStats = await context.Offers
-                .Where(o => o.OfferDate == todayPersian)
-                .GroupJoin(
-                    context.TradeReports.Where(t => t.TradeDate == todayPersian),
-                    o => o.Id,
-                    t => t.OfferId,
-                    (o, t) => new { Offer = o, Trades = t }
-                )
-                .Select(x => new ExcitementStat
+                // بهینه‌سازی: استفاده از کلاس داخلی به جای نوع داینامیک برای جلوگیری از خطا
+                var excitementStats = await context.Offers
+                    .Where(o => o.OfferDate == todayPersian)
+                    .GroupJoin(
+                        context.TradeReports.Where(t => t.TradeDate == todayPersian),
+                        o => o.Id,
+                        t => t.OfferId,
+                        (o, t) => new { Offer = o, Trades = t }
+                    )
+                    .Select(x => new ExcitementStat
+                    {
+                        InitPrice = x.Offer.InitPrice,
+                        OfferVol = x.Offer.OfferVol,
+                        InitVolume = x.Offer.InitVolume,
+                        FinalPriceSum = x.Trades.Sum(t => t.FinalWeightedAveragePrice * t.TradeVolume),
+                        TradeVolumeSum = x.Trades.Sum(t => t.TradeVolume),
+                        DemandVolumeSum = x.Trades.Sum(t => t.DemandVolume)
+                    })
+                    .ToListAsync();
+
+                if (!excitementStats.Any())
                 {
-                    InitPrice = x.Offer.InitPrice,
-                    OfferVol = x.Offer.OfferVol,
-                    InitVolume = x.Offer.InitVolume,
-                    FinalPriceSum = x.Trades.Sum(t => t.FinalWeightedAveragePrice * t.TradeVolume),
-                    TradeVolumeSum = x.Trades.Sum(t => t.TradeVolume),
-                    DemandVolumeSum = x.Trades.Sum(t => t.DemandVolume)
-                })
-                .ToListAsync();
+                    return new MarketExcitementData { Title = "بازار آرام", Description = "هنوز عرضه‌ای برای تحلیل هیجان بازار ثبت نشده است.", Percentage = 0, Label = "بدون فعالیت" };
+                }
 
-            if (!excitementStats.Any())
-            {
-                return new MarketExcitementData { Title = "بازار آرام", Description = "هنوز عرضه‌ای برای تحلیل هیجان بازار ثبت نشده است.", Percentage = 0, Label = "بدون فعالیت" };
-            }
+                var competitionIndex = CalculateCompetitionIndex(excitementStats);
+                var demandCoverageRate = CalculateDemandCoverageRate(excitementStats);
+                var completeTradeRate = CalculateCompleteTradeRate(excitementStats);
 
-            var competitionIndex = CalculateCompetitionIndex(excitementStats);
-            var demandCoverageRate = CalculateDemandCoverageRate(excitementStats);
-            var completeTradeRate = CalculateCompleteTradeRate(excitementStats);
+                var excitementMetrics = new List<(decimal Value, string Label, System.Func<decimal, (string Title, string Description)> GetContent)>
+                {
+                    (competitionIndex, "رقابت", GetCompetitionContent),
+                    (demandCoverageRate, "تقاضا", GetDemandContent),
+                    (completeTradeRate, "فروش", GetCompleteTradeContent)
+                };
 
-            var excitementMetrics = new List<(decimal Value, string Label, System.Func<decimal, (string Title, string Description)> GetContent)>
-            {
-                (competitionIndex, "رقابت", GetCompetitionContent),
-                (demandCoverageRate, "تقاضا", GetDemandContent),
-                (completeTradeRate, "فروش", GetCompleteTradeContent)
-            };
+                var topMetric = excitementMetrics.OrderByDescending(m => m.Value).First();
+                var content = topMetric.GetContent(topMetric.Value);
 
-            var topMetric = excitementMetrics.OrderByDescending(m => m.Value).First();
-            var content = topMetric.GetContent(topMetric.Value);
-
-            return new MarketExcitementData
-            {
-                Title = content.Title,
-                Description = content.Description,
-                Percentage = (int)System.Math.Round(topMetric.Value),
-                Label = topMetric.Label
-            };
+                return new MarketExcitementData
+                {
+                    Title = content.Title,
+                    Description = content.Description,
+                    Percentage = (int)System.Math.Round(topMetric.Value),
+                    Label = topMetric.Label
+                };
+            }, expirationInMinutes: 15);
         }
 
         // متدهای کمکی برای کار با نوع قوی تایپ شده بازنویسی شده‌اند
@@ -280,237 +296,264 @@ namespace IME.SpotDataApi.Services.Dashboard
         #region SupplyRisk
         public async Task<SupplyRiskData> GetSupplyRiskAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            string cacheKey = "Dashboard_SupplyRisk";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            var supplierStatsBySubGroup = await context.Offers
-                .Where(o => o.OfferDate == todayPersian)
-                .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => new { o, c })
-                .Join(context.SubGroups, j => j.c.ParentId, sg => sg.Id, (j, sg) => new { j.o, sg })
-                .GroupBy(x => x.sg)
-                .Select(g => new
+                var supplierStatsByCommodity = await context.Offers
+                    .Where(o => o.OfferDate == todayPersian)
+                    .Join(context.Commodities, o => o.CommodityId, c => c.Id, (o, c) => new { o, c })
+                    //Join(context.SubGroups, j => j.c.ParentId, sg => sg.Id, (j, sg) => new {j.c, j.o, sg })
+                    .GroupBy(x => x.c)
+                    .Select(g => new
+                    {
+                        CommodityId = g.Key.Id,
+                        CommodityName = g.Key.PersianName,
+                        SupplierCount = g.Select(x => x.o.SupplierId).Distinct().Count(),
+                        TotalOfferVolume = g.Sum(x => x.o.OfferVol)
+                    })
+                    .ToListAsync();
+
+                if (!supplierStatsByCommodity.Any())
                 {
-                    SubGroupId = g.Key.Id,
-                    SubGroupName = g.Key.PersianName,
-                    SupplierCount = g.Select(x => x.o.SupplierId).Distinct().Count(),
-                    TotalOfferVolume = g.Sum(x => x.o.OfferVol)
-                })
-                .ToListAsync();
+                    return new SupplyRiskData { Items = new List<SupplyRiskItem>() };
+                }
 
-            if (!supplierStatsBySubGroup.Any())
-            {
-                return new SupplyRiskData { Items = new List<SupplyRiskItem>() };
-            }
+                var items = new List<SupplyRiskItem>();
 
-            var items = new List<SupplyRiskItem>();
-
-            var highestRisk = supplierStatsBySubGroup
-                .OrderBy(s => s.SupplierCount)
-                .ThenByDescending(s => s.TotalOfferVolume)
-                .First();
-
-            items.Add(new SupplyRiskItem
-            {
-                Title = highestRisk.SubGroupName,
-                Subtitle = "ریسک بالا",
-                RiskLevel = RiskLevel.High,
-                Value = $"{highestRisk.SupplierCount} عرضه‌کننده"
-            });
-
-            if (supplierStatsBySubGroup.Count > 1)
-            {
-                var lowestRisk = supplierStatsBySubGroup
-                    .OrderByDescending(s => s.SupplierCount)
+                var highestRisk = supplierStatsByCommodity
+                    .OrderBy(s => s.SupplierCount)
                     .ThenByDescending(s => s.TotalOfferVolume)
                     .First();
 
-                if (lowestRisk.SubGroupId != highestRisk.SubGroupId)
+                items.Add(new SupplyRiskItem
                 {
-                    items.Add(new SupplyRiskItem
-                    {
-                        Title = lowestRisk.SubGroupName,
-                        Subtitle = "ریسک پایین",
-                        RiskLevel = RiskLevel.Low,
-                        Value = $"{lowestRisk.SupplierCount} عرضه‌کننده"
-                    });
-                }
-            }
+                    Title = highestRisk.CommodityName,
+                    Subtitle = "ریسک بالا",
+                    RiskLevel = RiskLevel.High,
+                    CommodityId = highestRisk.CommodityId,
+                    Value = $"{highestRisk.SupplierCount} عرضه‌کننده"
+                });
 
-            return new SupplyRiskData { Items = items };
+                if (supplierStatsByCommodity.Count > 1)
+                {
+                    var lowestRisk = supplierStatsByCommodity
+                        .OrderByDescending(s => s.SupplierCount)
+                        .ThenByDescending(s => s.TotalOfferVolume)
+                        .First();
+
+                    if (lowestRisk.CommodityId != highestRisk.CommodityId)
+                    {
+                        items.Add(new SupplyRiskItem
+                        {
+                            Title = lowestRisk.CommodityName,
+                            Subtitle = "ریسک پایین",
+                            RiskLevel = RiskLevel.Low,
+                            CommodityId = lowestRisk.CommodityId,
+                            Value = $"{lowestRisk.SupplierCount} عرضه‌کننده"
+                        });
+                    }
+                }
+
+                return new SupplyRiskData { Items = items };
+            }, expirationInMinutes: 15);
         }
         #endregion SupplyRisk
 
         #region MarketMovers
         public async Task<MarketMoversData> GetMarketMoversAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
+            string cacheKey = "Dashboard_MarketMovers";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            var moversData = await context.TradeReports
-                .Where(t => t.TradeDate == todayPersian && t.OfferBasePrice > 0 && t.OfferVolume > 0)
-                .Join(context.Commodities, t => t.CommodityId, c => c.Id, (t, c) => new { t, c })
-                .Join(context.SubGroups, j => j.c.ParentId, sg => sg.Id, (j, sg) => new { j.t, sg })
-                .Join(context.Manufacturers, j => j.t.ManufacturerId, m => m.Id, (j, m) => new
-                {
-                    SubGroupName = j.sg.PersianName,
-                    ManufacturerName = m.PersianName,
-                    Competition = ((j.t.FinalWeightedAveragePrice - j.t.OfferBasePrice) / j.t.OfferBasePrice) * 100,
-                    DemandRatio = j.t.DemandVolume / j.t.OfferVolume
-                })
-                .ToListAsync();
+                var moversData = await context.TradeReports
+                    .Where(t => t.TradeDate == todayPersian && t.OfferBasePrice > 0 && t.OfferVolume > 0)
+                    .Join(context.Commodities, t => t.CommodityId, c => c.Id, (t, c) => new { t, c })
+                    .Join(context.SubGroups, j => j.c.ParentId, sg => sg.Id, (j, sg) => new { j.t, sg })
+                    .Join(context.Manufacturers, j => j.t.ManufacturerId, m => m.Id, (j, m) => new
+                    {
+                        CommodityId = j.t.CommodityId,
+                        SubGroupName = j.sg.PersianName,
+                        ManufacturerName = m.PersianName,
+                        Competition = ((j.t.FinalWeightedAveragePrice - j.t.OfferBasePrice) / j.t.OfferBasePrice) * 100,
+                        DemandRatio = j.t.DemandVolume / j.t.OfferVolume
+                    })
+                    .ToListAsync();
 
-            var competitionItems = moversData
-                .OrderByDescending(d => d.Competition)
-                .GroupBy(d => d.SubGroupName) // Ensure unique subgroups
-                .Select(g => g.First())
-                .Take(2)
-                .Select((item, index) => new MarketMoverItem
-                {
-                    Rank = index + 1,
-                    Title = item.SubGroupName,
-                    Subtitle = item.ManufacturerName,
-                    Value = $"+{item.Competition:F1}%",
-                    ValueState = ValueState.Positive
-                })
-                .ToList();
+                var competitionItems = moversData
+                    .OrderByDescending(d => d.Competition)
+                    .GroupBy(d => d.SubGroupName) // Ensure unique subgroups
+                    .Select(g => g.First())
+                    .Take(2)
+                    .Select((item, index) => new MarketMoverItem
+                    {
+                        Rank = index + 1,
+                        CommodityId = item.CommodityId,
+                        Title = item.SubGroupName,
+                        Subtitle = item.ManufacturerName,
+                        Value = $"+{item.Competition:F1}%",
+                        ValueState = ValueState.Positive
+                    })
+                    .ToList();
 
-            var demandItems = moversData
-                .OrderByDescending(d => d.DemandRatio)
-                .GroupBy(d => d.SubGroupName) // Ensure unique subgroups
-                .Select(g => g.First())
-                .Take(2)
-                .Select((item, index) => new MarketMoverItem
-                {
-                    Rank = index + 1,
-                    Title = item.SubGroupName,
-                    Subtitle = item.ManufacturerName,
-                    Value = $"{item.DemandRatio:F1}x",
-                    ValueState = ValueState.Neutral
-                })
-                .ToList();
+                var demandItems = moversData
+                    .OrderByDescending(d => d.DemandRatio)
+                    .GroupBy(d => d.SubGroupName) // Ensure unique subgroups
+                    .Select(g => g.First())
+                    .Take(2)
+                    .Select((item, index) => new MarketMoverItem
+                    {
+                        Rank = index + 1,
+                        CommodityId = item.CommodityId,
+                        Title = item.SubGroupName,
+                        Subtitle = item.ManufacturerName,
+                        Value = $"{item.DemandRatio:F1}x",
+                        ValueState = ValueState.Neutral
+                    })
+                    .ToList();
 
-            return new MarketMoversData { CompetitionItems = competitionItems, DemandItems = demandItems };
+                return new MarketMoversData { CompetitionItems = competitionItems, DemandItems = demandItems };
+            }, expirationInMinutes: 15);
         }
         #endregion MarketMovers
 
         #region MainPlayers
         public async Task<List<MainPlayer>> GetMainPlayersAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
-
-            var trades = await context.TradeReports
-                .Where(t => t.TradeDate == todayPersian)
-                .Select(t => new { t.SupplierId, t.SellerBrokerId, t.TradeValue })
-                .ToListAsync();
-
-            if (!trades.Any()) return new List<MainPlayer>();
-
-            var totalMarketValue = trades.Sum(t => t.TradeValue);
-            if (totalMarketValue == 0) return new List<MainPlayer>();
-
-            var topSupplierData = trades
-                .GroupBy(t => t.SupplierId)
-                .Select(g => new { Id = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
-                .OrderByDescending(s => s.TotalValue)
-                .FirstOrDefault();
-
-            var topBrokerData = trades
-                .GroupBy(t => t.SellerBrokerId)
-                .Select(g => new { Id = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
-                .OrderByDescending(b => b.TotalValue)
-                .FirstOrDefault();
-
-            var mainPlayers = new List<MainPlayer>();
-
-            if (topSupplierData != null)
+            string cacheKey = "Dashboard_MainPlayers";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
             {
-                var topSupplierName = await context.Suppliers
-                    .Where(s => s.Id == topSupplierData.Id)
-                    .Select(s => new { s.Id, s.PersianName })
-                    .FirstOrDefaultAsync();
-                mainPlayers.Add(new MainPlayer
-                {
-                    Type = MainPlayerType.Supplier, Id = topSupplierName?.Id ?? 0,  Name = topSupplierName?.PersianName ?? "نامشخص", IconCssClass = "bi bi-buildings-fill",
-                    MarketShare = (topSupplierData.TotalValue / totalMarketValue) * 100
-                });
-            }
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            if (topBrokerData != null)
-            {
-                var topBrokerName = await context.Brokers
-                    .Where(b => b.Id == topBrokerData.Id)
-                    .Select(b => new { b.Id, b.PersianName })
-                    .FirstOrDefaultAsync();
-                mainPlayers.Add(new MainPlayer
+                var trades = await context.TradeReports
+                    .Where(t => t.TradeDate == todayPersian)
+                    .Select(t => new { t.SupplierId, t.SellerBrokerId, t.TradeValue })
+                    .ToListAsync();
+
+                if (!trades.Any()) return new List<MainPlayer>();
+
+                var totalMarketValue = trades.Sum(t => t.TradeValue);
+                if (totalMarketValue == 0) return new List<MainPlayer>();
+
+                var topSupplierData = trades
+                    .GroupBy(t => t.SupplierId)
+                    .Select(g => new { Id = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
+                    .OrderByDescending(s => s.TotalValue)
+                    .FirstOrDefault();
+
+                var topBrokerData = trades
+                    .GroupBy(t => t.SellerBrokerId)
+                    .Select(g => new { Id = g.Key, TotalValue = g.Sum(t => t.TradeValue) })
+                    .OrderByDescending(b => b.TotalValue)
+                    .FirstOrDefault();
+
+                var mainPlayers = new List<MainPlayer>();
+
+                if (topSupplierData != null)
                 {
-                    Type = MainPlayerType.Broker, Id = topBrokerName?.Id ?? 0, Name = topBrokerName?.PersianName ?? "نامشخص", IconCssClass = "bi bi-person-workspace",
-                    MarketShare = (topBrokerData.TotalValue / totalMarketValue) * 100
-                });
-            }
-            return mainPlayers;
+                    var topSupplierName = await context.Suppliers
+                        .Where(s => s.Id == topSupplierData.Id)
+                        .Select(s => new { s.Id, s.PersianName })
+                        .FirstOrDefaultAsync();
+                    mainPlayers.Add(new MainPlayer
+                    {
+                        Type = MainPlayerType.Supplier,
+                        Id = topSupplierName?.Id ?? 0,
+                        Name = topSupplierName?.PersianName ?? "نامشخص",
+                        IconCssClass = "bi bi-buildings-fill",
+                        MarketShare = (topSupplierData.TotalValue / totalMarketValue) * 100
+                    });
+                }
+
+                if (topBrokerData != null)
+                {
+                    var topBrokerName = await context.Brokers
+                        .Where(b => b.Id == topBrokerData.Id)
+                        .Select(b => new { b.Id, b.PersianName })
+                        .FirstOrDefaultAsync();
+                    mainPlayers.Add(new MainPlayer
+                    {
+                        Type = MainPlayerType.Broker,
+                        Id = topBrokerName?.Id ?? 0,
+                        Name = topBrokerName?.PersianName ?? "نامشخص",
+                        IconCssClass = "bi bi-person-workspace",
+                        MarketShare = (topBrokerData.TotalValue / totalMarketValue) * 100
+                    });
+                }
+                return mainPlayers;
+            }, expirationInMinutes: 15);
         }
         #endregion MainPlayers
 
         #region TradingHalls
         public async Task<TradingHallsData> GetTradingHallsAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
-
-            // رفع خطا: ابتدا داده‌ها را بدون مرتب‌سازی از دیتابیس واکشی می‌کنیم
-            var hallsDataUnsorted = await context.TradeReports
-                .Where(t => t.TradeDate == todayPersian)
-                .Join(context.Offers, t => t.OfferId, o => o.Id, (t, o) => new { t, o })
-                .GroupBy(x => x.o.TradingHallId)
-                .Select(g => new
-                {
-                    HallId = g.Key,
-                    TotalValue = g.Sum(x => x.t.TradeValue * 1000),
-                    TotalTradedVolume = g.Sum(x => x.t.TradeVolume),
-                    TotalOfferedVolume = g.Sum(x => x.o.OfferVol)
-                })
-                .Join(context.TradingHalls,
-                      h => h.HallId,
-                      th => th.Id,
-                      (h, th) => new
-                      {
-                          HallName = th.PersianName,
-                          h.TotalValue,
-                          AbsorptionRate = h.TotalOfferedVolume > 0 ? (h.TotalTradedVolume / h.TotalOfferedVolume) * 100 : 0
-                      })
-                .ToListAsync();
-            
-            // سپس مرتب‌سازی را در حافظه انجام می‌دهیم
-            var hallsData = hallsDataUnsorted
-                .OrderByDescending(h => h.TotalValue)
-                .ToList();
-
-            if (!hallsData.Any())
+            string cacheKey = "Dashboard_TradingHalls";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
             {
-                return new TradingHallsData { Items = new List<TradingHallItem>() };
-            }
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            var items = hallsData.Select(h =>
-            {
-                var (icon, bgClass) = GetHallVisuals(h.HallName);
-                ValueState state;
-                if (h.AbsorptionRate > 85) state = ValueState.Positive;
-                else if (h.AbsorptionRate > 60) state = ValueState.Neutral;
-                else state = ValueState.Negative;
+                // رفع خطا: ابتدا داده‌ها را بدون مرتب‌سازی از دیتابیس واکشی می‌کنیم
+                var hallsDataUnsorted = await context.TradeReports
+                    .Where(t => t.TradeDate == todayPersian)
+                    .Join(context.Offers, t => t.OfferId, o => o.Id, (t, o) => new { t, o })
+                    .GroupBy(x => x.o.TradingHallId)
+                    .Select(g => new
+                    {
+                        HallId = g.Key,
+                        TotalValue = g.Sum(x => x.t.TradeValue * 1000),
+                        TotalTradedVolume = g.Sum(x => x.t.TradeVolume),
+                        TotalOfferedVolume = g.Sum(x => x.o.OfferVol)
+                    })
+                    .Join(context.TradingHalls,
+                          h => h.HallId,
+                          th => th.Id,
+                          (h, th) => new
+                          {
+                              HallName = th.PersianName,
+                              h.TotalValue,
+                              AbsorptionRate = h.TotalOfferedVolume > 0 ? (h.TotalTradedVolume / h.TotalOfferedVolume) * 100 : 0
+                          })
+                    .ToListAsync();
 
-                return new TradingHallItem
+                // سپس مرتب‌سازی را در حافظه انجام می‌دهیم
+                var hallsData = hallsDataUnsorted
+                    .OrderByDescending(h => h.TotalValue)
+                    .ToList();
+
+                if (!hallsData.Any())
                 {
-                    Title = h.HallName,
-                    IconCssClass = icon,
-                    IconBgCssClass = bgClass,
-                    Value = FormatLargeNumber(h.TotalValue),
-                    Change = $"نسبت فروش به عرضه: {h.AbsorptionRate:F0}%",
-                    ChangeState = state
-                };
-            }).ToList();
+                    return new TradingHallsData { Items = new List<TradingHallItem>() };
+                }
 
-            return new TradingHallsData { Items = items };
+                var items = hallsData.Select(h =>
+                {
+                    var (icon, bgClass) = GetHallVisuals(h.HallName);
+                    ValueState state;
+                    if (h.AbsorptionRate > 85) state = ValueState.Positive;
+                    else if (h.AbsorptionRate > 60) state = ValueState.Neutral;
+                    else state = ValueState.Negative;
+
+                    return new TradingHallItem
+                    {
+                        Title = h.HallName,
+                        IconCssClass = icon,
+                        IconBgCssClass = bgClass,
+                        Value = FormatLargeNumber(h.TotalValue),
+                        Change = $"نسبت فروش به عرضه: {h.AbsorptionRate:F0}%",
+                        ChangeState = state
+                    };
+                }).ToList();
+
+                return new TradingHallsData { Items = items };
+            }, expirationInMinutes: 15);
         }
 
         private (string IconCssClass, string IconBgCssClass) GetHallVisuals(string hallName)
@@ -534,39 +577,43 @@ namespace IME.SpotDataApi.Services.Dashboard
         #region MarketProgress
         public async Task<MarketProgressData> GetMarketProgressAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var todayPersian = _dateHelper.GetPersian(DateTime.Now);
-
-            var query = from offer in context.Offers.Where(o => o.OfferDate == todayPersian)
-                        join commodity in context.Commodities on offer.CommodityId equals commodity.Id
-                        join subGroup in context.SubGroups on commodity.ParentId equals subGroup.Id
-                        join grp in context.Groups on subGroup.ParentId equals grp.Id
-                        join mainGroup in context.MainGroups on grp.ParentId equals mainGroup.Id
-                        join trade in context.TradeReports.Where(t => t.TradeDate == todayPersian)
-                              on offer.Id equals trade.OfferId into trades
-                        from trade in trades.DefaultIfEmpty()
-                        select new { mainGroup, offer, trade };
-
-            var progressItemsData = await query
-                .GroupBy(x => x.mainGroup)
-                .Select(g => new
-                {
-                    MainGroupName = g.Key.PersianName,
-                    TotalOffers = g.Select(x => x.offer.Id).Distinct().Count(),
-                    TradedOffers = g.Where(x => x.trade != null).Select(x => x.offer.Id).Distinct().Count()
-                })
-                .OrderByDescending(d => d.TotalOffers)
-                .ToListAsync();
-
-            var items = progressItemsData.Select(item => new MarketProgressDetail
+            string cacheKey = "Dashboard_MarketProgress";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
             {
-                Name = item.MainGroupName,
-                TotalOffers = item.TotalOffers,
-                TradedOffers = item.TradedOffers,
-                CssClass = GetMainGroupCssClass(item.MainGroupName)
-            }).ToList();
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var todayPersian = _dateHelper.GetPersian(DateTime.Now);
 
-            return new MarketProgressData { Items = items };
+                var query = from offer in context.Offers.Where(o => o.OfferDate == todayPersian)
+                            join commodity in context.Commodities on offer.CommodityId equals commodity.Id
+                            join subGroup in context.SubGroups on commodity.ParentId equals subGroup.Id
+                            join grp in context.Groups on subGroup.ParentId equals grp.Id
+                            join mainGroup in context.MainGroups on grp.ParentId equals mainGroup.Id
+                            join trade in context.TradeReports.Where(t => t.TradeDate == todayPersian)
+                                  on offer.Id equals trade.OfferId into trades
+                            from trade in trades.DefaultIfEmpty()
+                            select new { mainGroup, offer, trade };
+
+                var progressItemsData = await query
+                    .GroupBy(x => x.mainGroup)
+                    .Select(g => new
+                    {
+                        MainGroupName = g.Key.PersianName,
+                        TotalOffers = g.Select(x => x.offer.Id).Distinct().Count(),
+                        TradedOffers = g.Where(x => x.trade != null).Select(x => x.offer.Id).Distinct().Count()
+                    })
+                    .OrderByDescending(d => d.TotalOffers)
+                    .ToListAsync();
+
+                var items = progressItemsData.Select(item => new MarketProgressDetail
+                {
+                    Name = item.MainGroupName,
+                    TotalOffers = item.TotalOffers,
+                    TradedOffers = item.TradedOffers,
+                    CssClass = GetMainGroupCssClass(item.MainGroupName)
+                }).ToList();
+
+                return new MarketProgressData { Items = items };
+            }, expirationInMinutes: 15);
         }
 
         private string GetMainGroupCssClass(string mainGroupName)
@@ -590,21 +637,25 @@ namespace IME.SpotDataApi.Services.Dashboard
         #region SpotNotifications
         public async Task<SpotNotificationData> GetSpotNotificationsAsync()
         {
-            using var context = _contextFactory.CreateDbContext();
-            var todayNotifications = context.SpotNotifications
-                //.Where(n => n.NewsDateTime.Date == DateTime.Today)
-                .OrderByDescending(n => n.NewsDateTime)
-                .Take(5)
-                .ToList();
-
-            var items = todayNotifications.Select(n => new SpotNotificationItem
+            string cacheKey = "Dashboard_SpotNotifications";
+            return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
             {
-                Title = n.MainTitle ?? string.Empty,
-                Source = n.URL ?? string.Empty,
-                Category = GetNotificationCategory(n.MainTitle)
-            }).ToList();
+                using var context = _contextFactory.CreateDbContext();
+                var todayNotifications = context.SpotNotifications
+                    //.Where(n => n.NewsDateTime.Date == DateTime.Today)
+                    .OrderByDescending(n => n.NewsDateTime)
+                    .Take(5)
+                    .ToList();
 
-            return new SpotNotificationData { Items = items };
+                var items = todayNotifications.Select(n => new SpotNotificationItem
+                {
+                    Title = n.MainTitle ?? string.Empty,
+                    Source = n.URL ?? string.Empty,
+                    Category = GetNotificationCategory(n.MainTitle)
+                }).ToList();
+
+                return new SpotNotificationData { Items = items };
+            }, expirationInMinutes: 15);
         }
 
         private SpotNotificationCategory GetNotificationCategory(string? title)
@@ -619,7 +670,7 @@ namespace IME.SpotDataApi.Services.Dashboard
             if (title.Contains("پذیرش خودرو")) return SpotNotificationCategory.CarAcceptance;
             if (title.Contains("تمدید مجوز")) return SpotNotificationCategory.LicenseRenewal;
             if (title.Contains("ابلاغیه")) return SpotNotificationCategory.Announcement;
-            
+
             return SpotNotificationCategory.Other;
         }
         #endregion SpotNotifications

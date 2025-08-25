@@ -42,6 +42,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("{subGroupId}/header")]
         [ProducesResponseType(typeof(SubGroupHeaderData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetHeader(int subGroupId)
         {
             var data = await _subGroupService.GetSubGroupHeaderDataAsync(subGroupId);

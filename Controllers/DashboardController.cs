@@ -157,6 +157,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("news")]
         [ProducesResponseType(typeof(NewsData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public IActionResult GetNews()
         {
             var data = new NewsData
@@ -190,6 +191,7 @@ namespace IME.SpotDataApi.Controllers
         }
         [HttpGet("spot-notifications")]
         [ProducesResponseType(typeof(SpotNotificationData), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetspotNotifications()
         {
             //var data = new SpotNotificationData

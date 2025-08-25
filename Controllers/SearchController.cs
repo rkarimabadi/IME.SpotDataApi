@@ -15,6 +15,7 @@ namespace IME.SpotDataApi.Controllers
         }
 
         [HttpGet("{term}")]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> Search(string term)
         {
             var data = await _searchService.GlobalSearchAsync(term);

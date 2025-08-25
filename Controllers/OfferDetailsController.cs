@@ -18,6 +18,7 @@ namespace IME.SpotDataApi.Controllers
 
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(OfferViewModel), 200)]
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetOfferById(int id)
         {
             var data = await _offerDetailsService.GetOfferByIdAsync(id);

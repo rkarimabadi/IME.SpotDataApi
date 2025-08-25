@@ -6,6 +6,7 @@ using IME.SpotDataApi.Models.Notification;
 using IME.SpotDataApi.Repository;
 using IME.SpotDataApi.Services.Authenticate;
 using IME.SpotDataApi.Services.BrokerLevel;
+using IME.SpotDataApi.Services.Caching;
 using IME.SpotDataApi.Services.CommodityLevel;
 using IME.SpotDataApi.Services.Dashboard;
 using IME.SpotDataApi.Services.Data;
@@ -21,6 +22,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>();
+builder.Services.AddResponseCaching();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: MyAllowSpecificOrigins,
@@ -67,6 +69,8 @@ builder.Services.Configure<ApiEndpoints>(
     builder.Configuration.GetSection(ApiEndpoints.SectionName)
 );
 
+builder.Services.AddMemoryCache();
+
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<IDateHelper, DateHelper>();
@@ -83,6 +87,9 @@ builder.Services.AddScoped<ITradeReportRepository, TradeReportRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
 builder.Services.AddScoped(typeof(IDataRepository<>), typeof(DataRepository<>));
+
+builder.Services.AddScoped<ICacheService, MemoryCacheService>();
+
 var app = builder.Build();
 
 
@@ -95,7 +102,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors(MyAllowSpecificOrigins);
-
+app.UseResponseCaching(); 
 app.UseAuthorization();
 
 app.MapControllers();
